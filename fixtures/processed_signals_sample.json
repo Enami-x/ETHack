@@ -1,0 +1,66 @@
+[
+  {
+    "id": "sig-001",
+    "corridor": "hormuz",
+    "signal_type": "news",
+    "severity_hint": 0.85,
+    "text_summary": "Iran IRGC conducts live-fire naval drill near Strait of Hormuz chokepoint; tanker diversions reported.",
+    "timestamp": "2026-07-17T10:00:00Z"
+  },
+  {
+    "id": "sig-002",
+    "corridor": "hormuz",
+    "signal_type": "sanctions",
+    "severity_hint": 0.90,
+    "text_summary": "OFAC adds three Iranian crude tankers to SDN list; US treasury designates two shipping entities.",
+    "timestamp": "2026-07-17T08:30:00Z"
+  },
+  {
+    "id": "sig-003",
+    "corridor": "hormuz",
+    "signal_type": "shipping",
+    "severity_hint": 0.70,
+    "text_summary": "AIS data shows 14 VLCCs holding position outside Hormuz approach lanes; transit throughput down ~22%.",
+    "timestamp": "2026-07-17T11:15:00Z"
+  },
+  {
+    "id": "sig-004",
+    "corridor": "red_sea",
+    "signal_type": "news",
+    "severity_hint": 0.75,
+    "text_summary": "Houthi forces claim missile strike on bulk carrier in southern Red Sea; MSC and Maersk suspend transits.",
+    "timestamp": "2026-07-17T09:00:00Z"
+  },
+  {
+    "id": "sig-005",
+    "corridor": "red_sea",
+    "signal_type": "shipping",
+    "severity_hint": 0.80,
+    "text_summary": "AIS: 32 container vessels rerouting via Cape of Good Hope; Suez northbound lane volume at 18-month low.",
+    "timestamp": "2026-07-17T07:45:00Z"
+  },
+  {
+    "id": "sig-006",
+    "corridor": "red_sea",
+    "signal_type": "price",
+    "severity_hint": 0.55,
+    "text_summary": "Brent crude up 4.3% on open; Red Sea risk premium priced into tanker charter rates (+$120k/day WS).",
+    "timestamp": "2026-07-17T06:30:00Z"
+  },
+  {
+    "id": "sig-007",
+    "corridor": "suez",
+    "signal_type": "news",
+    "severity_hint": 0.35,
+    "text_summary": "Egyptian canal authority reports minor vessel grounding; single-lane transit operational, delays expected.",
+    "timestamp": "2026-07-17T05:00:00Z"
+  },
+  {
+    "id": "sig-008",
+    "corridor": "suez",
+    "signal_type": "price",
+    "severity_hint": 0.25,
+    "text_summary": "EIA reports slight uptick in Brent futures (+1.1%) attributed to Suez backlog; market consensus: transient.",
+    "timestamp": "2026-07-17T04:15:00Z"
+  }
+]

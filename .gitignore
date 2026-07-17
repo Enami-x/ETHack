@@ -159,3 +159,7 @@ Thumbs.db
 *.swo
 *.sublime-project
 *.sublime-workspace
+
+# Local uvicorn redirect output/logs
+uvicorn_*.txt
+
