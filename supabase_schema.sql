@@ -1,0 +1,117 @@
+-- =============================================================================
+-- AI-Driven Energy Supply Chain Resilience — Supabase Schema
+-- Run this entire file in your Supabase SQL editor (Dashboard → SQL Editor → New query)
+-- RLS is intentionally disabled for hackathon (service_role key used service-to-service)
+-- =============================================================================
+
+-- -------------------------------------------------------
+-- Stage 1 output: raw ingested signals from all sources
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS raw_signals (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source          TEXT NOT NULL CHECK (source IN ('gdelt','ais','ofac','eia','price_feed','mock')),
+    timestamp       TIMESTAMPTZ NOT NULL,
+    corridor        TEXT NOT NULL CHECK (corridor IN ('hormuz','red_sea','suez','other')),
+    raw_payload     JSONB NOT NULL DEFAULT '{}',
+    ingested_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------
+-- Stage 2 output: normalized/validated processed signals
+-- (stored in-memory only for the vertical slice — no table used)
+-- Included here so the full schema contract is documented.
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS processed_signals (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_signal_id   UUID REFERENCES raw_signals(id),
+    corridor        TEXT NOT NULL CHECK (corridor IN ('hormuz','red_sea','suez','other')),
+    signal_type     TEXT NOT NULL CHECK (signal_type IN ('news','shipping','sanctions','price')),
+    severity_hint   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    text_summary    TEXT NOT NULL DEFAULT '',
+    timestamp       TIMESTAMPTZ NOT NULL
+);
+
+-- -------------------------------------------------------
+-- Stage 3 output: risk score per corridor/supplier
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS risk_scores (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    corridor                TEXT NOT NULL CHECK (corridor IN ('hormuz','red_sea','suez','other')),
+    supplier                TEXT,
+    risk_score              DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    confidence              DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    explanation             TEXT NOT NULL DEFAULT '',
+    contributing_signals    TEXT[] NOT NULL DEFAULT '{}',
+    source                  TEXT NOT NULL CHECK (source IN ('real','mock')),
+    generated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------
+-- Stage 4 output: disruption scenario simulations
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS scenarios (
+    id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scenario_type                   TEXT NOT NULL,
+    severity                        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    supply_gap_pct                  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    price_impact_pct                DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    refinery_utilization_impact_pct DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    spr_days_remaining_estimate     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    assumptions                     TEXT[] NOT NULL DEFAULT '{}',
+    generated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------
+-- Stage 5 output: procurement recommendations
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS procurement_recs (
+    id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scenario_id                 UUID REFERENCES scenarios(id),
+    rank                        INTEGER NOT NULL DEFAULT 1,
+    supplier                    TEXT NOT NULL DEFAULT '',
+    route                       TEXT NOT NULL DEFAULT '',
+    spot_price_est              DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    transit_time_days           DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    refinery_compatibility_score DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    overall_score               DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    rationale                   TEXT NOT NULL DEFAULT '',
+    source                      TEXT NOT NULL CHECK (source IN ('real','mock')),
+    generated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------
+-- Stage 6 output: strategic reserve drawdown plans
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reserve_plans (
+    id                                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scenario_id                         UUID REFERENCES scenarios(id),
+    drawdown_schedule                   JSONB NOT NULL DEFAULT '[]',
+    days_of_cover_remaining             DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    replenishment_window_estimate_days  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    policy_recommendation               TEXT NOT NULL DEFAULT '',
+    generated_at                        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------
+-- Stage 7 output: compiled human-readable reports
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reports (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scenario_id     UUID REFERENCES scenarios(id),
+    risk_score_id   UUID REFERENCES risk_scores(id),
+    title           TEXT NOT NULL DEFAULT '',
+    body_markdown   TEXT NOT NULL DEFAULT '',
+    generated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =============================================================================
+-- Indexes for common query patterns
+-- =============================================================================
+CREATE INDEX IF NOT EXISTS idx_raw_signals_corridor     ON raw_signals(corridor);
+CREATE INDEX IF NOT EXISTS idx_raw_signals_timestamp    ON raw_signals(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_scores_corridor     ON risk_scores(corridor);
+CREATE INDEX IF NOT EXISTS idx_risk_scores_generated_at ON risk_scores(generated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scenarios_type           ON scenarios(scenario_type);
+CREATE INDEX IF NOT EXISTS idx_procurement_scenario     ON procurement_recs(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_reserve_scenario         ON reserve_plans(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_reports_scenario         ON reports(scenario_id);

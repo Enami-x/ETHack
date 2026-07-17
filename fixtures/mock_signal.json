@@ -1,0 +1,13 @@
+{
+  "id": "a1b2c3d4-0000-0000-0000-000000000001",
+  "source": "mock",
+  "timestamp": "2026-07-17T14:00:00Z",
+  "corridor": "hormuz",
+  "raw_payload": {
+    "headline": "Tensions rise in Strait of Hormuz as naval exercises begin",
+    "severity_hint": 0.72,
+    "entities": ["Iran", "IRGC", "Strait of Hormuz"],
+    "article_url": "https://example-mock.com/hormuz-tension"
+  },
+  "ingested_at": "2026-07-17T14:00:05Z"
+}
