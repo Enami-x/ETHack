@@ -119,3 +119,16 @@ CREATE INDEX IF NOT EXISTS idx_scenarios_type           ON scenarios(scenario_ty
 CREATE INDEX IF NOT EXISTS idx_procurement_scenario     ON procurement_recs(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_reserve_scenario         ON reserve_plans(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_reports_scenario         ON reports(scenario_id);
+
+-- -------------------------------------------------------
+-- Pipeline Run Logs
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    stage_timings JSONB,
+    total_latency_seconds FLOAT,
+    status TEXT,
+    error_detail TEXT
+);

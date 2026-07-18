@@ -1,52 +1,76 @@
 """
 FastAPI app — Energy Supply Chain Resilience API
 /api/main.py
-
-Endpoints
----------
-GET /              — health check
-GET /pipeline/latest — run the full vertical slice pipeline and return all 6 tables as JSON
-
-Usage:
-    uvicorn api.main:app --reload --port 8000
-    # then visit http://localhost:8000/pipeline/latest
 """
 
-from fastapi import FastAPI
+import json
+import pathlib
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-# Re-use the pipeline logic (it's pure Python, no side effects)
-from run_vertical_slice import run_pipeline, STATE
-
+from db.supabase_client import supabase
+from orchestrator.run_full_pipeline import run_pipeline, RUN_LOG_PATH
 
 app = FastAPI(
     title="Energy Supply Chain Resilience API",
-    description=(
-        "Vertical slice — mocked pipeline. "
-        "All data is hardcoded; no external services are called."
-    ),
-    version="0.1.0",
+    description="End-to-end ML pipeline for geopolitical supply chain risk.",
+    version="1.0.0",
 )
-
 
 @app.get("/", summary="Health check")
 def health() -> dict:
-    return {"status": "ok", "version": "0.1.0", "mode": "vertical_slice_mock"}
+    return {"status": "ok", "version": "1.0.0"}
 
+@app.get("/api/risk-scores", summary="Get latest risk scores per corridor")
+def get_risk_scores():
+    resp = supabase.table("risk_scores").select("*").order("generated_at", desc=True).limit(50).execute()
+    data = resp.data
+    # Filter for the latest per corridor
+    latest = {}
+    for row in data:
+        c = row["corridor"]
+        if c not in latest:
+            latest[c] = row
+    return list(latest.values())
 
-@app.get(
-    "/pipeline/latest",
-    summary="Run pipeline and return latest state of all 6 tables",
-    response_class=JSONResponse,
-)
-def pipeline_latest() -> dict:
-    """
-    Runs the full mocked pipeline end-to-end and returns the final in-memory state
-    as JSON — matching the 6 Supabase table schemas from ARCHITECTURE.md §5.
+@app.get("/api/scenarios", summary="Get latest scenario per type")
+def get_scenarios():
+    resp = supabase.table("scenarios").select("*").order("generated_at", desc=True).limit(50).execute()
+    data = resp.data
+    latest = {}
+    for row in data:
+        t = row["scenario_type"]
+        if t not in latest:
+            latest[t] = row
+    return list(latest.values())
 
-    Tables returned:
-        raw_signals, processed_signals, risk_scores,
-        scenarios, procurement_recs, reserve_plans, reports
-    """
-    state = run_pipeline()
-    return JSONResponse(content=state)
+@app.get("/api/procurement-recs", summary="Get ranked recommendations for a scenario")
+def get_procurement_recs(scenario_id: str):
+    resp = supabase.table("procurement_recs").select("*").eq("scenario_id", scenario_id).order("rank").execute()
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="No recommendations found for this scenario")
+    return resp.data
+
+@app.get("/api/reserve-plan", summary="Get reserve plan for a scenario")
+def get_reserve_plan(scenario_id: str):
+    resp = supabase.table("reserve_plans").select("*").eq("scenario_id", scenario_id).execute()
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="No reserve plan found for this scenario")
+    return resp.data[0]
+
+@app.get("/api/pipeline-status", summary="Get latest pipeline run latency and status")
+def get_pipeline_status():
+    if not RUN_LOG_PATH.exists():
+        raise HTTPException(status_code=404, detail="No pipeline runs recorded yet")
+    with open(RUN_LOG_PATH, "r", encoding="utf-8") as f:
+        runs = json.load(f)
+    if not runs:
+        raise HTTPException(status_code=404, detail="No pipeline runs recorded yet")
+    return runs[0]
+
+@app.post("/api/pipeline/run", summary="Trigger the full pipeline end-to-end")
+def trigger_pipeline():
+    # Synchronous for the hackathon as requested
+    log_data = run_pipeline()
+    return log_data

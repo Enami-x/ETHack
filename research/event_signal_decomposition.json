@@ -1,0 +1,182 @@
+[
+  {
+    "event": "2019-09-14 Abqaiq-Khurais Aramco attack",
+    "date": "2019-09-14",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.7,
+    "news_signal_strength": 0.5,
+    "shipping_signal_strength": 0.6,
+    "price_signal_strength": 0.2,
+    "notes": "Strong background sanctions context: US 'maximum pressure' Iran campaign ongoing. Low pre-event price volatility (Brent $55-60, relatively flat). Shipping incidents in Gulf throughout 2019 (May Fujairah tanker sabotage, July British tanker seizure). Saudi Aramco radar activated 5 days prior — some pre-attack awareness. Low market urgency in week before attack itself. Sources: Reuters Sep 2019; US DoD reports; Kpler AIS data."
+  },
+  {
+    "event": "2022-02-24 Russia-Ukraine invasion / OPEC+ sanctions escalation",
+    "date": "2022-02-24",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.8,
+    "news_signal_strength": 0.9,
+    "shipping_signal_strength": 0.7,
+    "price_signal_strength": 0.8,
+    "notes": "Very high pre-event signals on all dimensions. Sanctions threat well-telegraphed (US/EU threatened severe sanctions if Russia invaded). Intensive media coverage — troops massed at border for 2+ months. Black Sea shipping disruption already underway (partial blockade from Russian naval drills). Brent already rising from ~$85 to ~$97 in the 2 weeks before invasion. Sources: Riviera Maritime Media; Europa.eu; EIA energy market impact report."
+  },
+  {
+    "event": "2023-10-19 Houthi Red Sea attacks intensify",
+    "date": "2023-10-19",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.5,
+    "news_signal_strength": 0.9,
+    "shipping_signal_strength": 0.3,
+    "price_signal_strength": 0.6,
+    "notes": "Oct 7 Hamas attack on Israel triggered intense news coverage. Houthis issued threats publicly within days. Sanctions signal moderate (existing Iran/Houthi sanctions, not new escalation). Shipping signal low in pre-Oct-19 period — commercial shipping attacks didn't start until Galaxy Leader hijacking Nov 19; Oct 19 was the first USS Carney missile intercept. Brent rose on regional risk premium after Oct 7. Sources: USIP; Washington Institute; Reuters Oct 2023; ACLED data."
+  },
+  {
+    "event": "2025-06-01 US-Iran standoff Brent +8%",
+    "date": "2025-06-01",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.9,
+    "news_signal_strength": 0.8,
+    "shipping_signal_strength": 0.7,
+    "price_signal_strength": 0.6,
+    "notes": "US-Iran nuclear standoff in 2025 preceded by escalating sanctions rhetoric and OFAC designations. Heavy news coverage of Hormuz closure threats. AIS tracking shows Iran-linked tanker behavior changes (U-turns, zig-zags per Stage 3 Gemini output). Pre-event price already volatile with multiple US strike sessions. Sources: Problem statement; Stage 3 risk_intelligence.py output; Reuters June 2025."
+  },
+  {
+    "event": "2016-01-01 OPEC+ production freeze negotiations collapse",
+    "date": "2016-01-01",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.8,
+    "news_signal_strength": 0.6,
+    "shipping_signal_strength": 0.1,
+    "price_signal_strength": 0.9,
+    "notes": "Iran sanctions lifted in January 2016 (JCPOA implementation) — strong sanctions signal (removal not imposition, but a major structural market signal). Very high pre-event price signal: Brent already near $27-30/bbl multi-year lows, extreme price volatility throughout Dec 2015 - Jan 2016. Low shipping signal — no maritime incidents. News signal moderate (OPEC internal politics heavily covered). Sources: IEA OMR Jan 2016; FT reporting; WB commodity report."
+  },
+  {
+    "event": "2017-05-25 OPEC+ first coordinated production cut agreement",
+    "date": "2017-05-25",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.1,
+    "news_signal_strength": 0.8,
+    "shipping_signal_strength": 0.1,
+    "price_signal_strength": 0.4,
+    "notes": "First OPEC+ formal Vienna meeting with Russia was heavily covered in media for weeks before. Minimal sanctions signal — this was a cooperative supply management event. No shipping incidents. Price moderately elevated (~$50/bbl) ahead of the meeting. Markets largely priced in the expected cut before the announcement, explaining the -11% price_change_pct (buy the rumor, sell the news effect). Sources: EIA STEO June 2017; Reuters May 2017."
+  },
+  {
+    "event": "2018-05-08 US withdraws from Iran nuclear deal (JCPOA) — Iran sanctions re-imposed",
+    "date": "2018-05-08",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.9,
+    "news_signal_strength": 0.8,
+    "shipping_signal_strength": 0.1,
+    "price_signal_strength": 0.5,
+    "notes": "Highest possible sanctions signal — Trump explicitly telegraphed JCPOA withdrawal for months. Media coverage intense in the week before announcement. No shipping incidents pre-event. Brent had been rising steadily (~$70 by May 2018) on Iranian sanctions risk premium already built in. Sources: EIA Iran sanctions analysis Aug 2018; White House announcements; Reuters May 2018."
+  },
+  {
+    "event": "2019-06-13 Gulf of Oman tanker attacks (Kokuka Courageous / Front Altair)",
+    "date": "2019-06-13",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.7,
+    "news_signal_strength": 0.6,
+    "shipping_signal_strength": 0.7,
+    "price_signal_strength": 0.3,
+    "notes": "US 'maximum pressure' sanctions on Iran continuing. May 2019 Fujairah tanker sabotage (4 tankers) had already set high shipping alert baseline — strong recent precedent. News coverage of Gulf tensions elevated after May 12 attacks. US deployed USS Abraham Lincoln to region May 2019. Price signal moderate — Brent had dipped back to ~$61/bbl before attack. Sources: Reuters June 2019; gCaptain; US CENTCOM."
+  },
+  {
+    "event": "2020-03-06 OPEC+ talks collapse — Saudi Arabia launches price war vs Russia",
+    "date": "2020-03-06",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.1,
+    "news_signal_strength": 0.7,
+    "shipping_signal_strength": 0.0,
+    "price_signal_strength": 0.8,
+    "notes": "No sanctions signal — purely supply politics. High news signal: weeks of speculation about OPEC+ deal extension given COVID demand collapse; OPEC+ meeting on March 5 was front-page. Very high price signal: Brent had fallen from $65 to $50 in 6 weeks on COVID demand fear before the price war. Shipping signal zero — no maritime incidents. Sources: FT March 6 2020; Bloomberg; EIA STEO April 2020."
+  },
+  {
+    "event": "2020-04-12 OPEC+ historic 9.7 mb/d production cut agreed",
+    "date": "2020-04-12",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.0,
+    "news_signal_strength": 0.9,
+    "shipping_signal_strength": 0.0,
+    "price_signal_strength": 0.9,
+    "notes": "Largest coordinated cut in history — G20 energy ministers involved. Zero sanctions signal. Extreme media coverage in days before (G20 energy meeting April 10). Extreme price signal: WTI went negative April 20 nearby; Brent at $20-25/bbl. No shipping incidents — COVID had collapsed shipping volumes globally. Market-dominated event; price and news signals maximal. Sources: IEA OMR April 2020; EIA; FT."
+  },
+  {
+    "event": "2021-08-01 Kazakhstan Kashagan field shutdown — unplanned outage",
+    "date": "2021-08-01",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.0,
+    "news_signal_strength": 0.2,
+    "shipping_signal_strength": 0.1,
+    "price_signal_strength": 0.3,
+    "notes": "Essentially zero pre-event signals — unplanned maintenance outage. No sanctions involved. Very low news signal in 7 days before (announced suddenly). Low shipping signal — CPC pipeline from Kazakhstan continues; some tanker routing adjustments. Modest pre-event price signal: Brent in stable $70-75 range. Explains why actual_price_impact was near-zero (+0.14%). Sources: Reuters Aug 2021; KMG announcement."
+  },
+  {
+    "event": "2022-10-05 OPEC+ 2 mb/d production cut announcement",
+    "date": "2022-10-05",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.4,
+    "news_signal_strength": 0.7,
+    "shipping_signal_strength": 0.1,
+    "price_signal_strength": 0.5,
+    "notes": "OPEC+ meeting widely covered — cut was flagged as likely in pre-meeting media. Russia under heavy energy sanctions (Ukraine war context) contributing to moderate sanctions signal. No shipping incidents. Brent had recovered somewhat (~$90) after summer dip. Market reaction: +5.6% price over 30 days. Sources: EIA STEO Nov 2022; WSJ; Bloomberg Oct 2022."
+  },
+  {
+    "event": "2023-04-02 OPEC+ surprise voluntary cut of 1.16 mb/d",
+    "date": "2023-04-02",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.2,
+    "news_signal_strength": 0.3,
+    "shipping_signal_strength": 0.0,
+    "price_signal_strength": 0.4,
+    "notes": "Genuinely unexpected — surprise announcement Easter Sunday weekend. Very low news signal pre-event (market did NOT expect this cut). Low sanctions signal. Zero shipping signal. Price signal moderate (Brent ~$79, recovering from banking crisis-driven dip in March 2023). Brent rose 6% in 2 days but then fell back over 30 days (-11.3% actual). Sources: IEA OMR May 2023; Reuters April 2023; Bloomberg."
+  },
+  {
+    "event": "2023-06-04 Saudi Arabia additional 1 mb/d voluntary cut (extended)",
+    "date": "2023-06-04",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.2,
+    "news_signal_strength": 0.6,
+    "shipping_signal_strength": 0.0,
+    "price_signal_strength": 0.4,
+    "notes": "Saudi bilateral cut was flagged 2-3 days before at the OPEC meeting but not widely expected to extend at full magnitude. Moderate news signal (OPEC meeting always covered). No shipping signal. Price signal moderate (Brent ~$75 with demand concerns). 30-day price impact minimal (-0.6%) — market had priced it in quickly. Sources: OPEC press release; Reuters June 2023."
+  },
+  {
+    "event": "2024-04-01 Iran retaliatory drone/missile strike on Israel — Hormuz risk spike",
+    "date": "2024-04-01",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.6,
+    "news_signal_strength": 0.8,
+    "shipping_signal_strength": 0.5,
+    "price_signal_strength": 0.6,
+    "notes": "Iran strikes were threatened publicly after April 1 Israeli airstrike on Iranian consulate in Damascus. High news signal (major escalation potential widely discussed). Moderate sanctions signal (existing Iran/OFAC pressure). Shipping signal moderate — Red Sea Houthi incidents still ongoing in early 2024 kept shipping alerts elevated. Brent already high (~$87) on risk premium. Sources: Reuters/Al Jazeera April 2024; OFAC; Kpler."
+  },
+  {
+    "event": "2024-06-02 OPEC+ extends cuts through 2025, adds new voluntary cuts",
+    "date": "2024-06-02",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.2,
+    "news_signal_strength": 0.6,
+    "shipping_signal_strength": 0.3,
+    "price_signal_strength": 0.3,
+    "notes": "OPEC+ meeting well-advertised — extension widely expected so market reaction was muted. Low sanctions signal. Moderate news (OPEC meeting always in press). Shipping signal slightly elevated (Red Sea residual Houthi risk). Low price signal — Brent was relatively stable ~$82-85. 10.1% 30-day price gain likely reflects later unrelated Iran/Houthi escalation rather than the OPEC meeting itself. Sources: EIA STEO July 2024; Reuters June 2024."
+  },
+  {
+    "event": "2015-12-04 OPEC fails to agree production ceiling — spare capacity flood",
+    "date": "2015-12-04",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.5,
+    "news_signal_strength": 0.7,
+    "shipping_signal_strength": 0.0,
+    "price_signal_strength": 0.8,
+    "notes": "Iran sanctions removal negotiations (JCPOA) were ongoing in late 2015 — moderate sanctions signal as a structural market fear. OPEC meeting December 4 widely covered with high media signal. No shipping incidents. Very high price signal: Brent already at multi-year lows (~$40-44) with downward trend throughout 2015. The meeting failure led to -13.4% further price drop. Sources: IEA WEO 2015; Reuters Dec 2015; theguardian.com."
+  },
+  {
+    "event": "2022-09-30 Nord Stream pipeline sabotage — European gas/oil security shock",
+    "date": "2022-09-30",
+    "pre_event_window_days": 7,
+    "sanctions_signal_strength": 0.9,
+    "news_signal_strength": 0.7,
+    "shipping_signal_strength": 0.2,
+    "price_signal_strength": 0.6,
+    "notes": "Extremely high sanctions signal — Russia fully sanctioned since February 2022 invasion, EU energy embargo well underway. High news signal: sabotage itself was shocking but Russia-Ukraine energy infrastructure vulnerability was heavily covered pre-event. Low shipping signal (Baltic Sea, not oil tanker focused). Brent at ~$85-90 with Russia supply concerns baked in. Oil market impact was secondary (gas primary). Sources: EIA/Reuters Sep 2022; EU Council sanctions tracker."
+  }
+]

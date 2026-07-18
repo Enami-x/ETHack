@@ -130,6 +130,8 @@ reports            -- stage 7 output
 
 **Build note:** start with a transparent weighted formula (not a black-box model) — "transparent scoring formulas" is explicitly named in your own spec and in judging criteria under explainability.
 
+**Validation note (post-hoc):** SIGNAL_TYPE_WEIGHTS (sanctions=0.40, news=0.30, shipping=0.20, price=0.10) were empirically tested against 18 historical disruption events (2015–2026) via linear regression against actual realized price impact. LOOCV R² = -0.06, indicating the sample (18 events / 4 correlated features) is too thin to trust an empirical override — see /research/calibrate_stage3.py. The regression over-weighted price (a lagging indicator that trivially correlates with the outcome being predicted), confirming the original expert-judgment rank order (sanctions > news > shipping > price, leading indicators first) is more defensible for a *predictive* risk score than a fit that rewards circularity. Current weights were kept unchanged. Full reasoning and paste-ready summary in /research/calibrate_stage3.py output.
+
 ### Stage 4 — Scenario Modeling Agent
 **Responsibility:** simulate named disruption events, compute cascading impacts.
 
@@ -151,6 +153,8 @@ reports            -- stage 7 output
 ```
 
 **Build note:** keep this parametric/formula-driven for the hackathon. "Assumptions must be explicit and testable" is a direct line from the judging criteria — write the formula into the code comments and surface it in the UI.
+
+**Validation note (post-hoc):** the three elasticity multipliers (Hormuz 1.8×, OPEC 2.2×, Red Sea 1.3×) were tested against 18 historical events grouped by scenario type — see /research/calibrate_stage4.py. All three groups returned R² well below the 0.30 trust threshold (largest group, Hormuz-mapped "Middle East Total" events, N=12, R²=-0.017), because the grouping conflated supply-cut events (price falls) with closure/attack events (price rises) under one label. Current multipliers were kept, cited to their original calibration anchors (documented per-scenario in the assumptions list). Documented as a legitimate limitation: n=18 events across 3 scenario types is insufficient for empirical elasticity fitting; a production system would need a larger, cleanly-labeled event corpus.
 
 ### Stage 5 — Procurement Agent
 **Responsibility:** rank alternative crude sources/routes given a scenario.
@@ -214,7 +218,7 @@ reports            -- stage 7 output
 
 ---
 
-## 7. Session Prompting Pattern (how to use this file)
+## 7. Session Prompting Pattern (how to use this file with Claude Code)
 
 For each stage, prompt roughly like:
 

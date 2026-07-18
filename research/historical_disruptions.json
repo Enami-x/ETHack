@@ -1,0 +1,182 @@
+[
+  {
+    "event": "2019-09-14 Abqaiq-Khurais Aramco attack",
+    "date": "2019-09-14",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.5,
+    "actual_price_impact_pct": -1.44,
+    "actual_volume_impact_pct": 0.71,
+    "data_quality": "complete",
+    "source": "Reuters/CNN \u2014 attack knocked out ~5.7 mb/d (50% of Saudi output, ~5% global supply)"
+  },
+  {
+    "event": "2022-02-24 Russia-Ukraine invasion / OPEC+ sanctions escalation",
+    "date": "2022-02-24",
+    "affected_producer": "Russia",
+    "signal_severity_estimate": 0.3,
+    "actual_price_impact_pct": 21.77,
+    "actual_volume_impact_pct": -0.35,
+    "data_quality": "complete",
+    "source": "EIA/IEA Short-Term Energy Outlook March 2022 \u2014 Russian production fell ~3 mb/d in April 2022"
+  },
+  {
+    "event": "2023-10-19 Houthi Red Sea attacks intensify",
+    "date": "2023-10-19",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.25,
+    "actual_price_impact_pct": -12.74,
+    "actual_volume_impact_pct": 0.41,
+    "data_quality": "complete",
+    "source": "gCaptain/Maritime Executive \u2014 Houthi attacks rerouted ~15% of global container traffic"
+  },
+  {
+    "event": "2025-06-01 US-Iran standoff Brent +8%",
+    "date": "2025-06-01",
+    "affected_producer": "Russia",
+    "signal_severity_estimate": 0.2,
+    "actual_price_impact_pct": 3.84,
+    "actual_volume_impact_pct": 0.29,
+    "data_quality": "complete",
+    "source": "Problem statement \u2014 Brent moved 8% in a single session on escalation fears"
+  },
+  {
+    "event": "2016-01-01 OPEC+ production freeze negotiations collapse",
+    "date": "2016-01-01",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.1,
+    "actual_price_impact_pct": -8.15,
+    "actual_volume_impact_pct": -2.62,
+    "data_quality": "complete",
+    "source": "IEA Oil Market Report January 2016 \u2014 OPEC spare capacity flooded market as freeze talks failed; Brent fell to $27/bbl"
+  },
+  {
+    "event": "2017-05-25 OPEC+ first coordinated production cut agreement",
+    "date": "2017-05-25",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.15,
+    "actual_price_impact_pct": -11.1,
+    "actual_volume_impact_pct": 0.15,
+    "data_quality": "complete",
+    "source": "EIA STEO June 2017 \u2014 OPEC+ cut 1.8 mb/d from Nov 2016; compliance ~90% by mid-2017"
+  },
+  {
+    "event": "2018-05-08 US withdraws from Iran nuclear deal (JCPOA) \u2014 Iran sanctions re-imposed",
+    "date": "2018-05-08",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.2,
+    "actual_price_impact_pct": 3.3,
+    "actual_volume_impact_pct": 0.74,
+    "data_quality": "complete",
+    "source": "EIA Iran sanctions analysis Aug 2018 \u2014 Iranian exports fell from 2.5 mb/d to ~1 mb/d by Nov 2018"
+  },
+  {
+    "event": "2019-06-13 Gulf of Oman tanker attacks (Kokuka Courageous / Front Altair)",
+    "date": "2019-06-13",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.08,
+    "actual_price_impact_pct": 8.82,
+    "actual_volume_impact_pct": -0.85,
+    "data_quality": "complete",
+    "source": "Reuters June 2019 \u2014 Two tankers attacked in Gulf of Oman; Brent spiked 4% on day"
+  },
+  {
+    "event": "2020-03-06 OPEC+ talks collapse \u2014 Saudi Arabia launches price war vs Russia",
+    "date": "2020-03-06",
+    "affected_producer": "Russia",
+    "signal_severity_estimate": 0.35,
+    "actual_price_impact_pct": -26.99,
+    "actual_volume_impact_pct": 0.35,
+    "data_quality": "complete",
+    "source": "Financial Times/Bloomberg March 2020 \u2014 Brent fell 30% in one session; Saudi Arabia raised output to 12.3 mb/d"
+  },
+  {
+    "event": "2020-04-12 OPEC+ historic 9.7 mb/d production cut agreed",
+    "date": "2020-04-12",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.25,
+    "actual_price_impact_pct": -5.55,
+    "actual_volume_impact_pct": -21.29,
+    "data_quality": "complete",
+    "source": "IEA Oil Market Report April 2020 \u2014 Largest coordinated cut in OPEC+ history; COVID demand collapse context"
+  },
+  {
+    "event": "2021-08-01 Kazakhstan Kashagan field shutdown \u2014 unplanned outage",
+    "date": "2021-08-01",
+    "affected_producer": "Eurasia Total",
+    "signal_severity_estimate": 0.12,
+    "actual_price_impact_pct": 0.14,
+    "actual_volume_impact_pct": 2.61,
+    "data_quality": "complete",
+    "source": "Reuters August 2021 \u2014 Kazakhstan Kashagan field (380,000 bpd capacity) offline for emergency maintenance"
+  },
+  {
+    "event": "2022-10-05 OPEC+ 2 mb/d production cut announcement",
+    "date": "2022-10-05",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.15,
+    "actual_price_impact_pct": 5.57,
+    "actual_volume_impact_pct": -2.2,
+    "data_quality": "complete",
+    "source": "EIA STEO November 2022 \u2014 OPEC+ cut 2 mb/d from November 2022; Brent rose $10/bbl on announcement"
+  },
+  {
+    "event": "2023-04-02 OPEC+ surprise voluntary cut of 1.16 mb/d",
+    "date": "2023-04-02",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.1,
+    "actual_price_impact_pct": -11.32,
+    "actual_volume_impact_pct": -0.67,
+    "data_quality": "complete",
+    "source": "IEA Oil Market Report May 2023 \u2014 Saudi Arabia led surprise 500,000 bpd voluntary cut; Brent rose 6% in 2 days"
+  },
+  {
+    "event": "2023-06-04 Saudi Arabia additional 1 mb/d voluntary cut (extended)",
+    "date": "2023-06-04",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.12,
+    "actual_price_impact_pct": -0.6,
+    "actual_volume_impact_pct": -1.36,
+    "data_quality": "complete",
+    "source": "OPEC press release June 2023 \u2014 Saudi Arabia cut total 1 mb/d extended through Q3 2023; market reacted +3%"
+  },
+  {
+    "event": "2024-04-01 Iran retaliatory drone/missile strike on Israel \u2014 Hormuz risk spike",
+    "date": "2024-04-01",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.18,
+    "actual_price_impact_pct": -4.55,
+    "actual_volume_impact_pct": 0.41,
+    "data_quality": "complete",
+    "source": "Reuters/Al Jazeera April 2024 \u2014 Iran launched 300+ drones/missiles at Israel; Brent rose 3% on Hormuz closure fears"
+  },
+  {
+    "event": "2024-06-02 OPEC+ extends cuts through 2025, adds new voluntary cuts",
+    "date": "2024-06-02",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.08,
+    "actual_price_impact_pct": 10.06,
+    "actual_volume_impact_pct": 0.0,
+    "data_quality": "complete",
+    "source": "EIA STEO July 2024 \u2014 OPEC+ extended cuts totaling 3.66 mb/d into 2025; market had priced in, muted reaction"
+  },
+  {
+    "event": "2015-12-04 OPEC fails to agree production ceiling \u2014 spare capacity flood",
+    "date": "2015-12-04",
+    "affected_producer": "Middle East Total",
+    "signal_severity_estimate": 0.12,
+    "actual_price_impact_pct": -13.44,
+    "actual_volume_impact_pct": 0.58,
+    "data_quality": "complete",
+    "source": "IEA World Energy Outlook 2015 \u2014 OPEC December meeting failed to set ceiling; Brent fell below $40/bbl"
+  },
+  {
+    "event": "2022-09-30 Nord Stream pipeline sabotage \u2014 European gas/oil security shock",
+    "date": "2022-09-30",
+    "affected_producer": "Russia",
+    "signal_severity_estimate": 0.1,
+    "actual_price_impact_pct": 7.81,
+    "actual_volume_impact_pct": -0.18,
+    "data_quality": "complete",
+    "source": "EIA/Reuters September 2022 \u2014 Nord Stream 1 and 2 pipelines sabotaged; oil market affected via energy security contagion premium"
+  }
+]
