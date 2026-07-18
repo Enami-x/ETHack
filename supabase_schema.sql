@@ -9,7 +9,7 @@
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS raw_signals (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source          TEXT NOT NULL CHECK (source IN ('gdelt','ais','ofac','eia','price_feed','mock')),
+    source          TEXT NOT NULL CHECK (source IN ('rss','ais','ofac','eia','price_feed','mock')),
     timestamp       TIMESTAMPTZ NOT NULL,
     corridor        TEXT NOT NULL CHECK (corridor IN ('hormuz','red_sea','suez','other')),
     raw_payload     JSONB NOT NULL DEFAULT '{}',
@@ -18,17 +18,19 @@ CREATE TABLE IF NOT EXISTS raw_signals (
 
 -- -------------------------------------------------------
 -- Stage 2 output: normalized/validated processed signals
--- (stored in-memory only for the vertical slice — no table used)
--- Included here so the full schema contract is documented.
+-- One row per RSS article (signal_type='news'); ONE aggregated row per corridor for OFAC (signal_type='sanctions').
+-- contributing_signals stores the raw_signal IDs that fed this processed row.
 -- -------------------------------------------------------
-CREATE TABLE IF NOT EXISTS processed_signals (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    raw_signal_id   UUID REFERENCES raw_signals(id),
-    corridor        TEXT NOT NULL CHECK (corridor IN ('hormuz','red_sea','suez','other')),
-    signal_type     TEXT NOT NULL CHECK (signal_type IN ('news','shipping','sanctions','price')),
-    severity_hint   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    text_summary    TEXT NOT NULL DEFAULT '',
-    timestamp       TIMESTAMPTZ NOT NULL
+DROP TABLE IF EXISTS processed_signals CASCADE;
+CREATE TABLE processed_signals (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    corridor                TEXT NOT NULL CHECK (corridor IN ('hormuz','red_sea','suez','other')),
+    signal_type             TEXT NOT NULL CHECK (signal_type IN ('news','shipping','sanctions','price')),
+    severity_hint           DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    text_summary            TEXT NOT NULL DEFAULT '',
+    contributing_signals    TEXT[] NOT NULL DEFAULT '{}',
+    source                  TEXT NOT NULL DEFAULT 'real',
+    generated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- -------------------------------------------------------
@@ -109,6 +111,8 @@ CREATE TABLE IF NOT EXISTS reports (
 -- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_raw_signals_corridor     ON raw_signals(corridor);
 CREATE INDEX IF NOT EXISTS idx_raw_signals_timestamp    ON raw_signals(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_processed_signals_corridor    ON processed_signals(corridor);
+CREATE INDEX IF NOT EXISTS idx_processed_signals_generated   ON processed_signals(generated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_risk_scores_corridor     ON risk_scores(corridor);
 CREATE INDEX IF NOT EXISTS idx_risk_scores_generated_at ON risk_scores(generated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_scenarios_type           ON scenarios(scenario_type);

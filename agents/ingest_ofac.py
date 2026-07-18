@@ -54,6 +54,7 @@ Expected result: tens to low hundreds of high-precision vessel/entity signals.
 
 import csv
 import io
+import re
 import uuid
 import logging
 import pathlib
@@ -108,25 +109,39 @@ IRAN_PETROLEUM_PROGRAMS: list[str] = [
 ]
 
 # ---------------------------------------------------------------------------
-# SECONDARY FILTER — terms searched in Remarks field WITHIN program-matched entries.
-# Removes human designees with no direct petroleum/maritime nexus.
-# Used only for entries where SDN_Type is NOT "vessel".
+# SECONDARY FILTER — whole-word terms searched in Remarks field WITHIN
+# program-matched entries. Removes human designees (individuals, entities)
+# with no direct petroleum/maritime nexus.
+#
+# IMPORTANT: matching uses re.search with \b word boundaries so that e.g.
+#   PORT  does NOT match inside "Passport"
+#   OIL   does NOT match inside "Foil" or "Spoil"
+#   IMO   does NOT match inside "Emir"
+# Only whole-word occurrences count.
 # ---------------------------------------------------------------------------
 SECONDARY_REMARKS_TERMS: list[str] = [
-    "TANKER",
-    "VESSEL",
-    "PETROLEUM",
-    "OIL",
-    "CRUDE",
-    "LNG",
-    "MARITIME",
-    "SHIPPING",
+    "TANKER",        # explicit vessel mention
+    "VESSEL",        # generic vessel
+    "PETROLEUM",     # petroleum sector
+    "CRUDE",         # crude oil
+    "LNG",           # liquified natural gas
+    "MARITIME",      # maritime industry
+    "SHIPPING",      # shipping operations
     "IMO",           # IMO number present → confirmed vessel record
     "MMSI",          # MMSI → vessel transponder identifier
-    "PORT",
-    "CARGO",
-    "PETROCHEMICAL",
+    "CARGO",         # cargo operations
+    "PETROCHEMICAL", # petrochemical sector
+    # NOTE: "OIL" and "PORT" deliberately REMOVED — too short and substring-prone.
+    # "OIL" matched inside words like FOIL/COIL; "PORT" matched inside "Passport".
+    # Re-add only if word-boundary matching is verified sufficient for these.
 ]
+
+# Pre-compiled word-boundary regex pattern for the secondary terms (case-insensitive).
+# Built once at module load — O(1) per check instead of O(n) re-compilation.
+_SECONDARY_PATTERN: re.Pattern = re.compile(
+    r"\b(?:" + "|".join(re.escape(t) for t in SECONDARY_REMARKS_TERMS) + r")\b",
+    re.IGNORECASE,
+)
 
 # SDN.CSV column names (positional — file has no header row).
 SDN_COLUMNS = [
@@ -173,17 +188,26 @@ def _matches_program(row: dict) -> bool:
     return any(code.upper() in program_field for code in IRAN_PETROLEUM_PROGRAMS)
 
 
-def _matches_secondary(row: dict) -> bool:
+def _matches_secondary(row: dict) -> tuple[bool, str]:
     """
     SECONDARY FILTER (applied WITHIN program-matched rows):
-    Return True if SDN_Type is 'vessel' OR the Remarks field contains a
-    petroleum/shipping keyword from SECONDARY_REMARKS_TERMS.
+    Return (True, reason) if SDN_Type is 'vessel' OR the Remarks field
+    contains a whole-word petroleum/shipping keyword from SECONDARY_REMARKS_TERMS.
+    Return (False, "") otherwise.
+
+    Uses pre-compiled word-boundary regex (_SECONDARY_PATTERN) to prevent
+    substring false positives (e.g. PORT inside Passport, OIL inside Foil).
     """
     sdn_type = _clean(row.get("SDN_Type", "")).lower()
     if sdn_type == "vessel":
-        return True
-    remarks_upper = row.get("Remarks", "").upper()
-    return any(term in remarks_upper for term in SECONDARY_REMARKS_TERMS)
+        return True, "sdn_type=vessel"
+
+    remarks = row.get("Remarks", "")
+    m = _SECONDARY_PATTERN.search(remarks)
+    if m:
+        return True, f"remarks keyword: {m.group(0).upper()}"
+
+    return False, ""
 
 
 def _infer_corridor(row: dict) -> str:
@@ -318,15 +342,27 @@ def fetch_ofac_signals() -> list[dict]:
     # --- Stage A: program code filter ---
     program_matched = [r for r in all_rows if _matches_program(r)]
 
-    # --- Stage B: vessel/remarks secondary filter ---
-    final_matched = [r for r in program_matched if _matches_secondary(r)]
+    logger.info(
+        "[OFAC] Secondary filter keyword list (whole-word, case-insensitive):\n        %s",
+        ", ".join(SECONDARY_REMARKS_TERMS),
+    )
+
+    # --- Stage B: vessel/remarks secondary filter (word-boundary regex) ---
+    matched_with_reasons = [
+        (r, reason)
+        for r in program_matched
+        for passed, reason in [_matches_secondary(r)]
+        if passed
+    ]
+    final_matched = [r for r, _ in matched_with_reasons]
+    match_reasons = {r.get("ent_num", ""): reason for r, reason in matched_with_reasons}
 
     signals = [_row_to_raw_signal(row) for row in final_matched]
 
     logger.info(
         "[OFAC] Precision filter results: "
         "%d total SDN entries → %d program-matched (Iran/petroleum) → "
-        "%d vessel/petroleum-relevant → %d signals produced.",
+        "%d vessel/petroleum-relevant (word-boundary filter) → %d signals produced.",
         total, len(program_matched), len(final_matched), len(signals),
     )
-    return signals
+    return signals, match_reasons

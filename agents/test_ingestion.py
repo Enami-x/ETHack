@@ -1,15 +1,14 @@
 """
 /agents/test_ingestion.py
 =========================
-CLI test harness for Stage 1 — Data Collection (GDELT + OFAC ingesters).
+CLI test harness for Stage 1 — Data Collection (OFAC + RSS ingesters).
 
 What it does:
-  1. Calls fetch_gdelt_signals() for 'hormuz' and 'red_sea' corridors
-  2. Calls fetch_ofac_signals()
-  3. Prints signal count and 2 sample records per source
-  4. Validates every returned record against the §5 Stage 1 raw_signals schema
-  5. Writes all results to fixtures/raw_signals_live.json
-  6. Exits with code 1 if ANY validation error is found
+  1. Calls fetch_ofac_signals() — prints count, 5 samples with match-reason for each
+  2. Calls fetch_rss_signals() for 'hormuz' and 'red_sea' corridors
+  3. Validates every returned record against the §5 Stage 1 raw_signals schema
+  4. Writes all results to fixtures/raw_signals_live.json
+  5. Exits with code 1 if ANY validation error is found
 
 Usage (from repo root):
     python -m agents.test_ingestion
@@ -28,13 +27,11 @@ from datetime import datetime, timezone
 # Allow running as script or module
 # ---------------------------------------------------------------------------
 try:
-    from agents.ingest_gdelt import fetch_gdelt_signals
-    from agents.ingest_ofac import fetch_ofac_signals
+    from agents.ingest_ofac import fetch_ofac_signals, SECONDARY_REMARKS_TERMS
     from agents.ingest_rss import fetch_rss_signals
 except ModuleNotFoundError:
     sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
-    from agents.ingest_gdelt import fetch_gdelt_signals
-    from agents.ingest_ofac import fetch_ofac_signals
+    from agents.ingest_ofac import fetch_ofac_signals, SECONDARY_REMARKS_TERMS
     from agents.ingest_rss import fetch_rss_signals
 
 
@@ -53,7 +50,7 @@ logger = logging.getLogger(__name__)
 # §5 Stage 1 raw_signals schema definition
 # ---------------------------------------------------------------------------
 
-VALID_SOURCES   = {"gdelt", "ais", "ofac", "eia", "price_feed", "mock", "rss"}
+VALID_SOURCES   = {"ais", "ofac", "eia", "price_feed", "mock", "rss"}
 VALID_CORRIDORS = {"hormuz", "red_sea", "suez", "other"}
 
 REQUIRED_FIELDS: dict[str, type | tuple] = {
@@ -63,15 +60,6 @@ REQUIRED_FIELDS: dict[str, type | tuple] = {
     "corridor":    str,
     "raw_payload": dict,
     "ingested_at": str,
-}
-
-
-# ---------------------------------------------------------------------------
-# GDELT queries per corridor
-# ---------------------------------------------------------------------------
-GDELT_QUERIES = {
-    "hormuz":  "Hormuz OR \"Strait of Hormuz\" oil tanker OR naval",
-    "red_sea": "\"Red Sea\" OR Houthi tanker OR shipping OR attack",
 }
 
 
@@ -130,7 +118,7 @@ def validate_raw_signal(record: dict, label: str) -> list[str]:
                     f"[{label}] '{ts_field}' is not valid ISO8601: {record[ts_field]!r}"
                 )
 
-    # 5. raw_payload must not be empty (a signal with no payload is useless)
+    # 5. raw_payload must not be empty
     if "raw_payload" in record and isinstance(record["raw_payload"], dict):
         if not record["raw_payload"]:
             errors.append(f"[{label}] 'raw_payload' is empty dict.")
@@ -181,67 +169,32 @@ def main() -> None:
     all_errors:  list[str]  = []
 
     # =======================================================================
-    # GDELT — Hormuz
-    # =======================================================================
-    print(_sep("="))
-    print("  Source: GDELT  |  Corridor: hormuz")
-    print(_sep("-"))
-    hormuz_signals = fetch_gdelt_signals(
-        query=GDELT_QUERIES["hormuz"],
-        corridor="hormuz",
-    )
-    print(f"  Signals retrieved: {len(hormuz_signals)}")
-    if hormuz_signals:
-        _print_samples(hormuz_signals)
-    else:
-        print("  (no signals — GDELT may be rate-limiting or offline)\n")
-
-    errs = _validate_all(hormuz_signals, "gdelt/hormuz")
-    all_errors.extend(errs)
-    all_signals.extend(hormuz_signals)
-    if errs:
-        for e in errs:
-            print(f"  [FAIL] {e}")
-    else:
-        print(f"  [PASS] All {len(hormuz_signals)} GDELT/hormuz signals pass schema validation.")
-    print()
-
-    # =======================================================================
-    # GDELT — Red Sea
-    # =======================================================================
-    print(_sep("="))
-    print("  Source: GDELT  |  Corridor: red_sea")
-    print(_sep("-"))
-    red_sea_signals = fetch_gdelt_signals(
-        query=GDELT_QUERIES["red_sea"],
-        corridor="red_sea",
-    )
-    print(f"  Signals retrieved: {len(red_sea_signals)}")
-    if red_sea_signals:
-        _print_samples(red_sea_signals)
-    else:
-        print("  (no signals — GDELT may be rate-limiting or offline)\n")
-
-    errs = _validate_all(red_sea_signals, "gdelt/red_sea")
-    all_errors.extend(errs)
-    all_signals.extend(red_sea_signals)
-    if errs:
-        for e in errs:
-            print(f"  [FAIL] {e}")
-    else:
-        print(f"  [PASS] All {len(red_sea_signals)} GDELT/red_sea signals pass schema validation.")
-    print()
-
-    # =======================================================================
     # OFAC — SDN list
     # =======================================================================
     print(_sep("="))
-    print("  Source: OFAC  |  SDN energy/shipping filter")
+    print("  Source: OFAC  |  SDN Iran petroleum/shipping filter")
     print(_sep("-"))
-    ofac_signals = fetch_ofac_signals()
+
+    print("  Secondary filter keyword list (whole-word, case-insensitive):")
+    print(f"    {', '.join(SECONDARY_REMARKS_TERMS)}\n")
+
+    ofac_signals, match_reasons = fetch_ofac_signals()
     print(f"  Signals retrieved: {len(ofac_signals)}")
+
     if ofac_signals:
-        _print_samples(ofac_signals)
+        print(f"\n  5 sample records with match justification:")
+        for i, sig in enumerate(ofac_signals[:5], 1):
+            ent_num = sig["raw_payload"].get("ent_num", "")
+            name    = sig["raw_payload"].get("name", "")
+            sdn_t   = sig["raw_payload"].get("sdn_type", "") or "(no type)"
+            reason  = match_reasons.get(ent_num, "(unknown)")
+            remarks = sig["raw_payload"].get("remarks", "")[:120]
+            print(f"  [{i}] ent_num={ent_num}")
+            print(f"       name:     {name}")
+            print(f"       sdn_type: {sdn_t}")
+            print(f"       match:    >>> {reason} <<<")
+            print(f"       remarks:  {remarks}...")
+            print()
     else:
         print("  (no signals — OFAC download may have failed)\n")
 
@@ -317,8 +270,6 @@ def main() -> None:
     print(_sep("="))
     print("  SUMMARY")
     print(_sep("="))
-    print(f"  GDELT/hormuz   : {len(hormuz_signals)} signal(s)")
-    print(f"  GDELT/red_sea  : {len(red_sea_signals)} signal(s)")
     print(f"  OFAC           : {len(ofac_signals)} signal(s)")
     print(f"  RSS/hormuz     : {len(rss_hormuz_signals)} signal(s)")
     print(f"  RSS/red_sea    : {len(rss_red_sea_signals)} signal(s)")
