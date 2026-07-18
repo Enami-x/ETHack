@@ -1,0 +1,82 @@
+[
+  {
+    "supplier": "Russia",
+    "crude_grade": "Urals",
+    "corridor_dependency": [],
+    "typical_spot_price_usd_bbl": 68.50,
+    "typical_transit_time_days": 25,
+    "refinery_compatibility_score": 0.72,
+    "existing_relationship": true,
+    "notes": "India already imports ~40% of crude from Russia post-2022 at discounted prices. Ships via JNPT/Mundra directly — zero Hormuz or Red Sea dependency. G7 price cap (~$60/bbl) creates compliance complexity for Western-insured vessels; India uses shadow fleet or non-Western insurers. Urals is a medium-sour blend, well-suited to complex Indian refineries (Reliance, HPCL). Illustrative price estimate — actual trades at variable discounts to Brent."
+  },
+  {
+    "supplier": "USA",
+    "crude_grade": "WTI Crude",
+    "corridor_dependency": [],
+    "typical_spot_price_usd_bbl": 78.00,
+    "typical_transit_time_days": 45,
+    "refinery_compatibility_score": 0.80,
+    "existing_relationship": false,
+    "notes": "US crude exports to India have grown significantly since 2020. WTI is a light-sweet grade — excellent refinery compatibility. Long transit (~45 days via Cape or Suez) makes it expensive on freight; no Middle East corridor risk whatsoever. Higher spot price but pure corridor-independence makes it attractive as a hedge. Volumes are not yet at scale for full substitution of Gulf crude. Illustrative estimate."
+  },
+  {
+    "supplier": "Nigeria",
+    "crude_grade": "Bonny Light",
+    "corridor_dependency": [],
+    "typical_spot_price_usd_bbl": 76.50,
+    "typical_transit_time_days": 22,
+    "refinery_compatibility_score": 0.85,
+    "existing_relationship": true,
+    "notes": "Bonny Light is a premium light-sweet crude, one of the best grade-matches for Indian refineries designed for Middle Eastern crude. Nigeria is a long-standing OPEC member; India has episodic import history. No Hormuz or Red Sea transit dependency — ships direct from West Africa across Indian Ocean. Political stability risks (Boko Haram, militant activity in Niger Delta) add supply reliability discount. Illustrative estimate."
+  },
+  {
+    "supplier": "Brazil",
+    "crude_grade": "Pre-Salt Crude",
+    "corridor_dependency": [],
+    "typical_spot_price_usd_bbl": 74.00,
+    "typical_transit_time_days": 40,
+    "refinery_compatibility_score": 0.70,
+    "existing_relationship": false,
+    "notes": "Brazil's deepwater pre-salt fields (Santos Basin) produce a medium-light crude. Petrobras has growing export ambitions. No Middle East corridor dependency. Long Atlantic/Cape transit (~40 days). Compatibility is moderate — some Indian refineries require upgrades for different sulfur profile vs Middle Eastern grades. Volumes are growing rapidly (Petrobras 2024 record output). Emerging India-Brazil energy relationship. Illustrative estimate."
+  },
+  {
+    "supplier": "Guyana",
+    "crude_grade": "Liza Blend",
+    "corridor_dependency": [],
+    "typical_spot_price_usd_bbl": 77.00,
+    "typical_transit_time_days": 38,
+    "refinery_compatibility_score": 0.78,
+    "existing_relationship": false,
+    "notes": "Guyana is the fastest-growing new oil producer globally (ExxonMobil/Hess/CNOOC consortium). Liza Blend is a light-sweet crude. Volumes are currently limited but growing rapidly toward 1.2 mb/d by 2027. No Middle East corridor exposure. Relatively high per-barrel cost due to ultra-deepwater production. Good grade match for complex Indian refineries. Illustrative estimate; actual FOB pricing not yet widely published."
+  },
+  {
+    "supplier": "UAE",
+    "crude_grade": "Murban",
+    "corridor_dependency": ["hormuz"],
+    "typical_spot_price_usd_bbl": 80.00,
+    "typical_transit_time_days": 10,
+    "refinery_compatibility_score": 0.90,
+    "existing_relationship": true,
+    "notes": "Murban (ADNOC) is a premium light-sweet crude and one of the best grade-matches for Indian refineries. Very short transit time from UAE to India. HOWEVER: fully Hormuz-dependent — in a Hormuz partial closure scenario, UAE crude exports are among the first affected. UAE pipelines (Abu Dhabi Crude Oil Pipeline to Fujairah) bypass Hormuz for some volumes (~1.8 mb/d capacity), providing partial mitigation. Partial corridor exposure assumed. Illustrative estimate."
+  },
+  {
+    "supplier": "Saudi Arabia",
+    "crude_grade": "Arab Light",
+    "corridor_dependency": ["hormuz"],
+    "typical_spot_price_usd_bbl": 79.00,
+    "typical_transit_time_days": 12,
+    "refinery_compatibility_score": 0.88,
+    "existing_relationship": true,
+    "notes": "Saudi Arabia is India's single largest crude supplier historically. Arab Light is a benchmark medium-sour grade, excellent refinery compatibility with most Indian refineries. Very short transit from Ras Tanura. FULLY Hormuz-dependent — all Saudi crude export terminals (Ras Tanura, Juaymah) are in the Persian Gulf. In a Hormuz disruption, Saudi Arabia loses most of its India-supply capability. Should rank lower during Hormuz scenarios despite excellent base metrics. Illustrative estimate."
+  },
+  {
+    "supplier": "Iraq",
+    "crude_grade": "Basra Heavy",
+    "corridor_dependency": ["hormuz"],
+    "typical_spot_price_usd_bbl": 69.00,
+    "typical_transit_time_days": 14,
+    "refinery_compatibility_score": 0.75,
+    "existing_relationship": true,
+    "notes": "Iraq is India's second-largest crude supplier. Basra Heavy/Medium are price-competitive heavy-sour grades. Iraq also has Kirkuk crude exported via Turkey's Ceyhan port (Mediterranean pipeline bypass) — but this volume is limited and plagued by Iraq-Kurdistan payment disputes. Primary export route is Basra (Persian Gulf) = Hormuz-dependent. Pipeline bypass capacity is partial mitigation. Mixed corridor exposure — modelled as Hormuz-dependent for conservative scoring. Illustrative estimate."
+  }
+]
