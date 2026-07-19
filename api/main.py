@@ -7,6 +7,7 @@ import json
 import pathlib
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from db.supabase_client import supabase
@@ -16,6 +17,14 @@ app = FastAPI(
     title="Energy Supply Chain Resilience API",
     description="End-to-end ML pipeline for geopolitical supply chain risk.",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for hackathon deployment
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/", summary="Health check")
