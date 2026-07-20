@@ -136,6 +136,35 @@ def _normalize_ofac_group(corridor: str, entries: list[dict]) -> dict:
     }
 
 
+def _normalize_eia(raw: dict) -> dict:
+    """
+    Convert a single EIA price raw_signal to a processed_signals row.
+
+    signal_type = "price"  (weight 0.10 in risk formula — confirming, not leading)
+    severity_hint = pre-computed price momentum from ingest_eia.py
+    """
+    payload  = raw.get("raw_payload", {})
+    severity = payload.get("severity_computed", 0.5)
+    brent    = payload.get("brent_usd", "?")
+    pct      = payload.get("pct_change_7d", 0.0)
+    corridor = raw.get("corridor", "other")
+    date     = payload.get("date", "")
+
+    return {
+        "id":                   str(uuid.uuid4()),
+        "corridor":             corridor,
+        "signal_type":          "price",
+        "severity_hint":        round(float(severity), 4),
+        "text_summary":         (
+            f"Brent crude ${brent}/bbl on {date} "
+            f"({'+'if pct>=0 else ''}{pct:.1f}% vs 7 days ago)"
+        ),
+        "contributing_signals": [raw.get("id", "")],
+        "source":               "real",
+        "generated_at":         datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # =============================================================================
 # PUBLIC API
 # =============================================================================
@@ -174,6 +203,9 @@ def normalize_signals(raw_signals: list[dict]) -> list[dict]:
             corridor = raw.get("corridor", "other")
             ofac_by_corridor[corridor].append(raw)
             ofac_count += 1
+
+        elif source == "eia":
+            processed.append(_normalize_eia(raw))
 
         else:
             logger.debug("[normalize] Unknown source '%s' — skipping.", source)
