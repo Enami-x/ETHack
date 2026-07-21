@@ -59,6 +59,39 @@ HIGH_SEVERITY_SCORE:   float = 0.8
 MEDIUM_SEVERITY_SCORE: float = 0.5
 LOW_SEVERITY_SCORE:    float = 0.3
 
+# Negation / de-escalation awareness (Task 5).
+# Raw keyword matching fires HIGH on "attack averted", "no missile threat", or
+# "blockade fears recede" — all of which are DE-ESCALATIONS, not events. To fix this
+# WITHOUT abandoning the transparent rule-based approach, a keyword hit is discounted
+# when a negation/de-escalation term appears within NEGATION_WINDOW_WORDS tokens of it.
+#
+#   - A tier fires only if it has at least one NON-negated keyword hit.
+#   - If every HIGH/MEDIUM hit in the text is negated (i.e. de-escalation was detected
+#     but no live threat survives), severity is pinned to LOW rather than the tier score.
+#
+# These are proximity heuristics, not NLP — deliberately simple and auditable.
+NEGATION_TERMS: frozenset[str] = frozenset({
+    # pure negation
+    "no", "not", "never", "without", "nether",
+    # threat neutralised
+    "averted", "avert", "averts", "avoided", "avoid", "avoids",
+    "prevented", "prevent", "prevents", "thwarted", "thwart", "foiled", "foils",
+    "intercepted", "intercept", "spared", "unharmed",
+    # de-escalation / receding
+    "recede", "recedes", "receded", "receding",
+    "ease", "eased", "eases", "easing", "eass",
+    "subside", "subsides", "subsided", "subsiding",
+    "calm", "calmed", "calming", "resolved", "resolve", "resolves",
+    "deescalate", "deescalation", "deescalates", "deescalated",
+    "defused", "defuse", "defuses",
+    # denial / falsity
+    "denies", "denied", "deny", "unfounded", "false", "dismissed", "dismisses",
+    "ruled", "rules",  # "ruled out" / "rules out"
+})
+
+# How many word-tokens on each side of a keyword hit are scanned for a negation term.
+NEGATION_WINDOW_WORDS: int = 3
+
 # OFAC severity formula — background risk floor from sanctions count per corridor.
 # Formula:  severity_hint = min(count / OFAC_SEVERITY_DIVISOR, OFAC_SEVERITY_CAP)
 #
@@ -77,17 +110,68 @@ VALID_CORRIDORS = {"hormuz", "red_sea", "suez", "other"}
 # INTERNAL HELPERS
 # =============================================================================
 
+def _tokenize(text: str) -> list[str]:
+    """Lowercase word-token list used for proximity-based negation checks."""
+    import re
+    return re.findall(r"[a-z0-9']+", text.lower())
+
+
+def _keyword_hit_positions(tokens: list[str], keyword: str) -> list[tuple[int, int]]:
+    """Return (start, end) token-index spans where `keyword` (possibly multi-word)
+    occurs as a contiguous run of tokens."""
+    parts = keyword.split()
+    spans: list[tuple[int, int]] = []
+    for i in range(len(tokens) - len(parts) + 1):
+        if tokens[i:i + len(parts)] == parts:
+            spans.append((i, i + len(parts) - 1))
+    return spans
+
+
+def _span_is_negated(tokens: list[str], start: int, end: int) -> bool:
+    """True if a NEGATION_TERM appears within NEGATION_WINDOW_WORDS tokens on either
+    side of the keyword span [start, end] (the negation/de-escalation heuristic)."""
+    lo = max(0, start - NEGATION_WINDOW_WORDS)
+    hi = min(len(tokens), end + 1 + NEGATION_WINDOW_WORDS)
+    context = tokens[lo:start] + tokens[end + 1:hi]
+    return any(tok in NEGATION_TERMS for tok in context)
+
+
+def _tier_hit(tokens: list[str], keywords: list[str]) -> tuple[bool, bool]:
+    """
+    Scan `tokens` for `keywords`. Returns (has_non_negated_hit, has_any_hit):
+      - has_non_negated_hit → a live keyword hit with no nearby negation (tier fires)
+      - has_any_hit         → at least one hit, negated or not (de-escalation signal)
+    """
+    any_hit = False
+    for kw in keywords:
+        for (start, end) in _keyword_hit_positions(tokens, kw):
+            any_hit = True
+            if not _span_is_negated(tokens, start, end):
+                return True, True
+    return False, any_hit
+
+
 def _rss_severity(title: str, summary: str) -> float:
     """
-    Compute severity_hint for an RSS news signal.
-    Searches combined title+summary for HIGH then MEDIUM keywords (case-insensitive).
-    Returns HIGH_SEVERITY_SCORE, MEDIUM_SEVERITY_SCORE, or LOW_SEVERITY_SCORE.
+    Compute severity_hint for an RSS news signal (negation/de-escalation aware — Task 5).
+
+    Searches combined title+summary for HIGH then MEDIUM keywords. A tier only fires on
+    a NON-negated hit. If HIGH/MEDIUM keywords appear but every occurrence is negated
+    (e.g. "attack averted", "no missile", "blockade fears recede"), severity is pinned
+    to LOW instead of the tier score.
     """
-    text = (title + " " + summary).lower()
-    if any(kw in text for kw in HIGH_SEVERITY_KEYWORDS):
+    tokens = _tokenize(title + " " + summary)
+
+    high_fires, high_any = _tier_hit(tokens, HIGH_SEVERITY_KEYWORDS)
+    if high_fires:
         return HIGH_SEVERITY_SCORE
-    if any(kw in text for kw in MEDIUM_SEVERITY_KEYWORDS):
+
+    med_fires, med_any = _tier_hit(tokens, MEDIUM_SEVERITY_KEYWORDS)
+    if med_fires:
         return MEDIUM_SEVERITY_SCORE
+
+    # Keywords were present but all negated → explicit de-escalation → LOW.
+    # (Falls through to LOW anyway, but documented here for clarity.)
     return LOW_SEVERITY_SCORE
 
 

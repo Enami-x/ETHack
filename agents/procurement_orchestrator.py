@@ -68,10 +68,27 @@ WEIGHTS: dict[str, float] = {
 
 assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9, "WEIGHTS must sum to 1.0"
 
-# How much of the corridor_safety score is penalised per unit of scenario severity.
-# At severity=1.0, a fully exposed supplier loses this full fraction of corridor_safety.
-# At severity=0.5, it loses half. Named constant — testable / adjustable.
-CORRIDOR_PENALTY_SCALE: float = 1.0
+# -----------------------------------------------------------------------------
+# TWO PENALTY TYPES (Task 7) — a single linear corridor penalty conflated two very
+# different disruption mechanisms. They are now distinct:
+#
+#   AVAILABILITY penalty — the disrupted corridor makes the supplier's volume
+#     physically UNAVAILABLE (a Hormuz closure strands Gulf export terminals). This
+#     is severe: at severity 1.0 an exposed supplier loses essentially all corridor
+#     safety, because the barrels simply cannot sail.
+#
+#   COST/DELAY penalty — the disruption does NOT strand volume but forces a costlier,
+#     slower reroute (a Red Sea suspension pushes cargo around the Cape of Good Hope,
+#     +10–14 days, +freight). The supplier is still usable, just degraded — so the
+#     penalty is materially smaller than an availability loss.
+#
+# Which penalty applies is chosen by the scenario's disruption MECHANISM, not by a
+# one-size scale. Both are named, testable constants.
+AVAILABILITY_PENALTY_SCALE: float = 1.0   # exposed volume lost at severity 1.0
+COST_DELAY_PENALTY_SCALE:   float = 0.5   # exposed volume merely rerouted/pricier
+
+# Back-compat alias (older callers referenced a single CORRIDOR_PENALTY_SCALE).
+CORRIDOR_PENALTY_SCALE: float = AVAILABILITY_PENALTY_SCALE
 
 # Map from scenario_type to which corridors are affected.
 SCENARIO_CORRIDOR_MAP: dict[str, list[str]] = {
@@ -79,6 +96,16 @@ SCENARIO_CORRIDOR_MAP: dict[str, list[str]] = {
     "opec_emergency_cut":     [],           # not corridor-specific; affects all routes
     "red_sea_suspension":     ["red_sea"],
 }
+
+# Disruption MECHANISM per scenario_type — selects which penalty type applies.
+#   "availability" → exposed supplier volume is lost (severe penalty)
+#   "cost_delay"   → exposed supplier volume is rerouted, slower/pricier (mild penalty)
+SCENARIO_MECHANISM: dict[str, str] = {
+    "hormuz_partial_closure": "availability",  # Gulf terminals stranded → volume loss
+    "red_sea_suspension":     "cost_delay",    # Cape rerouting → delay + freight cost
+    "opec_emergency_cut":     "availability",  # supply-side volume loss (no corridor)
+}
+DEFAULT_MECHANISM: str = "availability"
 
 
 # =============================================================================
@@ -97,21 +124,35 @@ def _normalise_lower_better(value: float, min_val: float, max_val: float) -> flo
     return max(0.0, min(1.0, round(score, 4)))
 
 
-def _corridor_penalty(supplier: dict, affected_corridors: list[str], severity: float) -> float:
+def _corridor_penalty(
+    supplier: dict,
+    affected_corridors: list[str],
+    severity: float,
+    mechanism: str,
+) -> tuple[float, str]:
     """
-    Return a penalty [0, 1] based on whether this supplier's corridor_dependency
-    overlaps with the affected corridors.
+    Return (penalty, penalty_type) based on whether this supplier's corridor_dependency
+    overlaps the affected corridors AND the scenario's disruption mechanism (Task 7).
 
-    penalty = severity × CORRIDOR_PENALTY_SCALE  (if overlap exists)
-    penalty = 0.0                                 (if no overlap)
+      not exposed              → (0.0, "none")
+      exposed, availability    → (severity × AVAILABILITY_PENALTY_SCALE, "availability")
+      exposed, cost_delay      → (severity × COST_DELAY_PENALTY_SCALE,   "cost_delay")
+
+    The availability penalty models stranded volume (severe); the cost/delay penalty
+    models a costlier/slower reroute (mild). Penalty is clamped to [0, 1].
     """
     dep = supplier.get("corridor_dependency", [])
     if not dep:           # explicit empty list → no corridor exposure
-        return 0.0
+        return 0.0, "none"
     exposed = any(c in affected_corridors for c in dep)
     if not exposed:
-        return 0.0
-    return round(min(1.0, severity * CORRIDOR_PENALTY_SCALE), 4)
+        return 0.0, "none"
+
+    if mechanism == "cost_delay":
+        scale, ptype = COST_DELAY_PENALTY_SCALE, "cost_delay"
+    else:  # "availability" (default)
+        scale, ptype = AVAILABILITY_PENALTY_SCALE, "availability"
+    return round(min(1.0, severity * scale), 4), ptype
 
 
 def _route_description(supplier: dict, affected_corridors: list[str]) -> str:
@@ -155,6 +196,7 @@ def rank_suppliers(scenario: dict, suppliers: list[dict]) -> list[dict]:
     scenario_id   = scenario.get("id")  # may be None if scenario wasn't DB-persisted
 
     affected_corridors = SCENARIO_CORRIDOR_MAP.get(scenario_type, [])
+    mechanism          = SCENARIO_MECHANISM.get(scenario_type, DEFAULT_MECHANISM)
 
     # -------------------------------------------------------------------------
     # Compute normalisation ranges across the supplier pool
@@ -177,7 +219,9 @@ def rank_suppliers(scenario: dict, suppliers: list[dict]) -> list[dict]:
         )
         compat_score  = float(sup["refinery_compatibility_score"])
         rel_score     = 1.0 if sup.get("existing_relationship") else 0.0
-        penalty       = _corridor_penalty(sup, affected_corridors, severity)
+        penalty, penalty_type = _corridor_penalty(
+            sup, affected_corridors, severity, mechanism
+        )
         corridor_score = round(1.0 - penalty, 4)
 
         overall = round(
@@ -196,6 +240,7 @@ def rank_suppliers(scenario: dict, suppliers: list[dict]) -> list[dict]:
             "_compat_score":     compat_score,
             "_corridor_score":   corridor_score,
             "_corridor_penalty": penalty,
+            "_penalty_type":     penalty_type,
             "_rel_score":        rel_score,
             "overall_score":     overall,
         })
@@ -210,21 +255,37 @@ def rank_suppliers(scenario: dict, suppliers: list[dict]) -> list[dict]:
     results: list[dict] = []
 
     for rank_idx, item in enumerate(scored, start=1):
-        sup         = item["_supplier_data"]
-        penalty     = item["_corridor_penalty"]
-        overall     = item["overall_score"]
-        corridor_sc = item["_corridor_score"]
+        sup          = item["_supplier_data"]
+        penalty      = item["_corridor_penalty"]
+        penalty_type = item["_penalty_type"]
+        overall      = item["overall_score"]
+        corridor_sc  = item["_corridor_score"]
 
         route = _route_description(sup, affected_corridors)
 
-        # Template-based rationale — explicit, no LLM needed here
-        penalty_clause = (
-            f" HOWEVER, {sup['supplier']} is {affected_corridors[0].replace('_',' ').title()}-dependent "
-            f"and receives a corridor risk penalty of {penalty:.2f} (severity {severity:.1f} × {CORRIDOR_PENALTY_SCALE}× scale), "
-            f"reducing corridor_safety score to {corridor_sc:.2f}."
-            if penalty > 0.0
-            else f" {sup['supplier']} has zero exposure to the disrupted corridor(s) — no penalty applied."
-        )
+        # Template-based rationale — explicit, no LLM needed here. The clause names the
+        # DISRUPTION MECHANISM (availability loss vs cost/delay reroute) so the two
+        # penalty types are visible, not conflated (Task 7).
+        if penalty > 0.0 and penalty_type == "availability":
+            scale = AVAILABILITY_PENALTY_SCALE
+            penalty_clause = (
+                f" HOWEVER, {sup['supplier']} is {affected_corridors[0].replace('_',' ').title()}-dependent, "
+                f"and this scenario STRANDS that volume (availability loss): AVAILABILITY penalty "
+                f"{penalty:.2f} (severity {severity:.1f} × {scale}× scale), cutting corridor_safety to "
+                f"{corridor_sc:.2f} — these barrels cannot sail while the corridor is closed."
+            )
+        elif penalty > 0.0 and penalty_type == "cost_delay":
+            scale = COST_DELAY_PENALTY_SCALE
+            penalty_clause = (
+                f" NOTE: {sup['supplier']} is {affected_corridors[0].replace('_',' ').title()}-dependent, but "
+                f"this scenario REROUTES rather than strands the volume: COST/DELAY penalty "
+                f"{penalty:.2f} (severity {severity:.1f} × {scale}× scale), softening corridor_safety to "
+                f"{corridor_sc:.2f} — cargo still arrives via a longer, costlier route (e.g. Cape of Good Hope)."
+            )
+        else:
+            penalty_clause = (
+                f" {sup['supplier']} has zero exposure to the disrupted corridor(s) — no penalty applied."
+            )
         rel_clause = (
             " Existing trading relationship enables faster contract execution."
             if sup.get("existing_relationship")

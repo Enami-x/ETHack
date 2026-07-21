@@ -30,16 +30,19 @@ import math
 import logging
 from datetime import datetime, timezone
 
+from config import assumptions
+
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# BASELINE CONSTANTS — sourced from the problem statement
+# BASELINE CONSTANTS — now sourced from config/assumptions.py (Task 6)
 # =============================================================================
 
-# India's SPR baseline cover (days of crude import equivalent).
-# Source: problem statement — "India's SPR provides ~9.5 days of cover".
-SPR_BASELINE_DAYS: float = 9.5
+# India's SPR baseline cover (days of crude-import equivalent) = strategic reserve
+# actually on hand: 9.5 days at full capacity × ~64% current fill ≈ 6.08 days.
+# (Was a flat 9.5.) Full sourcing + the 74-day total-buffer context live in config.
+SPR_BASELINE_DAYS: float = assumptions.SPR_BASELINE_DAYS
 
 # Estimated disruption duration by scenario type (in days).
 # These are documented assumptions, not forecasts. Adjust as conditions evolve.
@@ -79,11 +82,14 @@ REPLENISHMENT_OVERHEAD_FACTOR: float = 1.5
 
 # CRITICAL: below this threshold, SPR cover is dangerously low.
 # Recommended posture: maximum drawdown rate + emergency procurement.
-SPR_DAYS_CRITICAL: float = 5.0
+# From config: rescaled from the old 5.0 by current SPR fill (≈ 3.2) so the band
+# stays meaningful against the ~6.08-day effective baseline.
+SPR_DAYS_CRITICAL: float = assumptions.SPR_DAYS_CRITICAL
 
 # CAUTION: between CAUTION and STABLE thresholds.
 # Recommended posture: moderate drawdown + expedited procurement.
-SPR_DAYS_CAUTION: float = 8.0
+# From config: rescaled from the old 8.0 by current SPR fill (≈ 5.1).
+SPR_DAYS_CAUTION: float = assumptions.SPR_DAYS_CAUTION
 
 # STABLE: above this threshold.
 # Recommended posture: precautionary drawdown + normal procurement diversification.
@@ -91,78 +97,131 @@ SPR_DAYS_CAUTION: float = 8.0
 
 
 # =============================================================================
-# DRAWDOWN SCHEDULE — FRONT-LOADED PIECEWISE LINEAR TAPER
+# DRAWDOWN SCHEDULE — LEAD-TIME-AWARE PIECEWISE TAPER (Task 8)
 # =============================================================================
 #
-# Mechanism:
-#   Divide the disruption window into 3 equal phases.
-#   Assign a PHASE_WEIGHT to each phase — these are relative weights per DAY
-#   within the phase, not absolute fractions:
+# The old taper hardcoded procurement coming online at N/3 and 2N/3 of the window,
+# implicitly ASSUMING alternate supply arrives exactly on that schedule. In reality
+# procurement has a real LEAD TIME (contract execution + long-haul voyage) before the
+# first replacement cargo lands — read from config.PROCUREMENT_LEAD_TIME_DAYS. Until
+# that day the SPR bears the FULL supply gap; only afterwards can the draw taper.
 #
-#     Phase 1 weight per day: PHASE_WEIGHT_HIGH   (crisis onset — full SPR load)
-#     Phase 2 weight per day: PHASE_WEIGHT_MED    (partial procurement online)
-#     Phase 3 weight per day: PHASE_WEIGHT_LOW    (procurement largely substituting)
+# The lead time is uncertain, so we expose the tradeoff as two selectable MODES rather
+# than baking one assumption in:
 #
-#   Raw weight for day d:
-#       if d in Phase 1: raw_weight[d] = PHASE_WEIGHT_HIGH
-#       if d in Phase 2: raw_weight[d] = PHASE_WEIGHT_MED
-#       if d in Phase 3: raw_weight[d] = PHASE_WEIGHT_LOW
+#   AGGRESSIVE — trust the lead-time estimate. Procurement is assumed online at exactly
+#     lead_time days. Draw the SPR hard and front-loaded before then, taper sharply
+#     after relief is expected. Conserves reserve for a tail that (if the bet holds)
+#     needs little — but if procurement SLIPS, the reserve was already spent.
 #
-#   Normalised draw_pct[d] = raw_weight[d] / SUM(raw_weight)
-#   This guarantees SUM(draw_pct) == 1.0 exactly (all available drawdown allocated).
+#   CONSERVATIVE — hedge that the lead time slips (× CONSERVATIVE_LEAD_SLIP_FACTOR).
+#     Procurement is assumed online later, and the draw is rationed more evenly (a
+#     flatter taper) so the reserve survives a longer UNAIDED gap. Costs more reserve
+#     over the full window but is robust to procurement delay.
 #
-# Rationale for front-loading:
-#   Day 1–N/3: Stage 5 procurement (alternate sourcing) is not yet operational.
-#     Ships take days to redirect; new contracts take time to execute.
-#     SPR must compensate at full rate.
-#   Day N/3–2N/3: Some alternate procurement online (e.g. Russia / Nigeria cargoes
-#     already en route). SPR supplements rather than replaces.
-#   Day 2N/3–N: Procurement largely online; SPR tapers to near-zero as new
-#     cargoes arrive and inventory normalises.
-#
-# TESTABLE constants — adjust phase weights to change the taper shape:
+# Both are normalised so SUM(draw_pct) == 1.0 (100% of available drawdown allocated).
+# TESTABLE constants below.
 
-PHASE_WEIGHT_HIGH: float = 3.0  # front-loaded phase (days 1 to N//3)
-PHASE_WEIGHT_MED:  float = 1.5  # middle phase       (days N//3+1 to 2*N//3)
-PHASE_WEIGHT_LOW:  float = 0.5  # tail phase          (days 2*N//3+1 to N)
+# Per-day phase weights, per mode: (high = pre-procurement crisis load, med = ramping,
+# low = procurement largely online). Aggressive is steeply front-loaded; conservative
+# is deliberately flatter so the reserve is rationed across a longer possible gap.
+PHASE_WEIGHTS_BY_MODE: dict[str, dict[str, float]] = {
+    "aggressive":   {"high": 3.0, "med": 1.5, "low": 0.5},
+    "conservative": {"high": 1.5, "med": 1.1, "low": 0.8},
+}
+
+# Conservative mode assumes procurement lands this many times LATER than the nominal
+# lead time (i.e. plans for slippage). Aggressive mode uses a factor of 1.0.
+CONSERVATIVE_LEAD_SLIP_FACTOR: float = 1.5
+
+# Back-compat aliases (older references expected single PHASE_WEIGHT_* names).
+PHASE_WEIGHT_HIGH: float = PHASE_WEIGHTS_BY_MODE["aggressive"]["high"]
+PHASE_WEIGHT_MED:  float = PHASE_WEIGHTS_BY_MODE["aggressive"]["med"]
+PHASE_WEIGHT_LOW:  float = PHASE_WEIGHTS_BY_MODE["aggressive"]["low"]
+
+VALID_DRAWDOWN_MODES = tuple(PHASE_WEIGHTS_BY_MODE.keys())
 
 
-def _build_drawdown_schedule(window_days: int) -> list[dict]:
+def _procurement_online_day(window_days: int, lead_time_days: int, mode: str) -> int:
     """
-    Build the normalised day-by-day drawdown schedule.
+    Day on which alternate procurement is ASSUMED to begin substituting for the SPR.
+    Aggressive trusts the nominal lead time; conservative inflates it by the slip
+    factor. Clamped to [1, window_days] so the phase boundaries stay inside the window.
+    """
+    slip = CONSERVATIVE_LEAD_SLIP_FACTOR if mode == "conservative" else 1.0
+    online = int(round(lead_time_days * slip))
+    return max(1, min(window_days, online))
 
-    Returns a list of dicts: [{"day": 1, "draw_pct": 0.xxxx}, ...]
-    where SUM(draw_pct) == 1.0 (100% of available drawdown allocated).
 
-    Phase boundaries use integer division to handle non-divisible windows gracefully:
-        phase1: days 1 .. p1_end      (first ~1/3)
-        phase2: days p1_end+1 .. p2_end (middle ~1/3)
-        phase3: days p2_end+1 .. window (final ~1/3)
+def _build_drawdown_schedule(
+    window_days: int,
+    lead_time_days: int,
+    mode: str,
+) -> list[dict]:
+    """
+    Build the normalised day-by-day drawdown schedule for `mode`, anchored to when
+    procurement is assumed to come online (a function of lead time + mode).
+
+    Returns [{"day": 1, "draw_pct": 0.xxxx}, ...] with SUM(draw_pct) == 1.0.
+
+    Phases:
+        phase1 (HIGH): days 1 .. online_day                 — SPR bears the full gap
+        phase2 (MED) : days online_day+1 .. online_day+ramp — procurement ramping
+        phase3 (LOW) : remaining days                       — procurement largely online
+    where ramp = half of the post-online remainder (at least 1 day if any remain).
     """
     if window_days < 1:
         return []
 
-    p1_end = window_days // 3          # end of phase 1 (1-indexed day count)
-    p2_end = (2 * window_days) // 3    # end of phase 2
+    weights = PHASE_WEIGHTS_BY_MODE.get(mode, PHASE_WEIGHTS_BY_MODE["conservative"])
+    online  = _procurement_online_day(window_days, lead_time_days, mode)
+    remain  = window_days - online
+    ramp    = max(1, remain // 2) if remain > 0 else 0
+    p2_end  = online + ramp
 
-    # Assign raw weights
     raw_weights: list[float] = []
     for day in range(1, window_days + 1):
-        if day <= p1_end:
-            raw_weights.append(PHASE_WEIGHT_HIGH)
+        if day <= online:
+            raw_weights.append(weights["high"])
         elif day <= p2_end:
-            raw_weights.append(PHASE_WEIGHT_MED)
+            raw_weights.append(weights["med"])
         else:
-            raw_weights.append(PHASE_WEIGHT_LOW)
+            raw_weights.append(weights["low"])
 
     total = sum(raw_weights)
+    return [
+        {"day": day, "draw_pct": round(w / total, 6)}
+        for day, w in enumerate(raw_weights, start=1)
+    ]
 
-    schedule: list[dict] = []
-    for day, w in enumerate(raw_weights, start=1):
-        draw = round(w / total, 6)
-        schedule.append({"day": day, "draw_pct": draw})
 
-    return schedule
+def _build_dual_mode_schedule(
+    window_days: int,
+    lead_time_days: int,
+    primary_mode: str,
+) -> list[dict]:
+    """
+    Build a single drawdown_schedule array (backward-compatible: each element still has
+    'day' + 'draw_pct') that ALSO carries both modes' values per day, so the lead-time
+    tradeoff is visible without a schema change:
+        [{"day", "draw_pct"(=primary), "draw_pct_conservative", "draw_pct_aggressive"}]
+    The dashboard chart reads 'draw_pct' (the primary mode) and ignores the extras.
+    """
+    cons = {d["day"]: d["draw_pct"]
+            for d in _build_drawdown_schedule(window_days, lead_time_days, "conservative")}
+    aggr = {d["day"]: d["draw_pct"]
+            for d in _build_drawdown_schedule(window_days, lead_time_days, "aggressive")}
+    primary = cons if primary_mode == "conservative" else aggr
+
+    return [
+        {
+            "day": day,
+            "draw_pct": primary[day],
+            "draw_pct_conservative": cons[day],
+            "draw_pct_aggressive": aggr[day],
+        }
+        for day in range(1, window_days + 1)
+    ]
 
 
 # =============================================================================
@@ -186,6 +245,8 @@ def _build_policy_recommendation(
     days_remaining: float,
     window_days: int,
     replenishment_days: float,
+    lead_time_days: int,
+    mode: str,
 ) -> str:
     """
     Generate a template-based, one-paragraph policy recommendation.
@@ -221,12 +282,26 @@ def _build_policy_recommendation(
         )
 
     stype_display = scenario_type.replace("_", " ").title()
+
+    # Lead-time-aware taper description (Task 8): the taper is anchored to when
+    # procurement is assumed online (a function of lead time + mode), not a fixed N/3.
+    cons_online = _procurement_online_day(window_days, lead_time_days, "conservative")
+    aggr_online = _procurement_online_day(window_days, lead_time_days, "aggressive")
+    mode_text = (
+        f"Drawdown mode = {mode.upper()} over a {window_days}-day window with an assumed "
+        f"procurement lead time of {lead_time_days} days. "
+        f"AGGRESSIVE trusts that lead time (procurement online ~day {aggr_online}; SPR drawn "
+        f"hard and front-loaded before then, tapering sharply after) — conserves reserve but "
+        f"is exposed if procurement slips. CONSERVATIVE plans for slippage "
+        f"(×{CONSERVATIVE_LEAD_SLIP_FACTOR}; procurement assumed online ~day {cons_online}; "
+        f"SPR rationed more evenly) — robust to delay but spends more reserve across the "
+        f"window. Both per-day curves are in drawdown_schedule (draw_pct = the "
+        f"{mode.upper()} curve; draw_pct_conservative / draw_pct_aggressive alongside)."
+    )
+
     return (
         f"[{label}] {stype_display} scenario at severity {severity:.1f} creates a "
-        f"{gap_pct_display}% supply gap. {urgency_text} "
-        f"Front-loaded SPR drawdown is scheduled over {window_days} days "
-        f"(heavier draws in days 1–{window_days//3}, tapering as alternate procurement "
-        f"comes online by days {(2*window_days)//3}–{window_days}). "
+        f"{gap_pct_display}% supply gap. {urgency_text} {mode_text} "
         f"Replenishment window estimated at {replenishment_days:.0f} days post-disruption "
         f"(disruption window × {REPLENISHMENT_OVERHEAD_FACTOR}× overhead for contract "
         f"renegotiation lag). "
@@ -239,7 +314,7 @@ def _build_policy_recommendation(
 # PUBLIC API
 # =============================================================================
 
-def optimize_reserves(scenario: dict) -> dict:
+def optimize_reserves(scenario: dict, mode: str = "conservative") -> dict:
     """
     Compute a reserve_plans row (§5 Stage 6 schema) for a given Stage 4 scenario.
 
@@ -247,13 +322,20 @@ def optimize_reserves(scenario: dict) -> dict:
         scenario: A Stage 4 run_scenario() output or Supabase scenarios row.
                   Required keys: scenario_type, severity, supply_gap_pct,
                   spr_days_remaining_estimate. 'id' used as scenario_id if present.
+        mode:     Drawdown posture — "conservative" (default; hedge against procurement
+                  lead-time slippage, ration the SPR more evenly) or "aggressive" (trust
+                  the lead-time estimate, front-load the draw). Governs which per-day
+                  curve is the primary draw_pct; BOTH curves are always returned so the
+                  lead-time tradeoff is visible (Task 8).
 
     Returns:
-        Dict matching the reserve_plans schema exactly:
+        Dict matching the reserve_plans schema. drawdown_schedule stays a list of
+        {"day", "draw_pct"} (chart-compatible) but each element ALSO carries
+        draw_pct_conservative / draw_pct_aggressive:
         {
             "id":                               str (uuid4),
             "scenario_id":                      str | None,
-            "drawdown_schedule":                list[dict],  # [{"day": int, "draw_pct": float}]
+            "drawdown_schedule":                list[dict],
             "days_of_cover_remaining":          float,       # passed through from Stage 4
             "replenishment_window_estimate_days": float,
             "policy_recommendation":            str,
@@ -261,12 +343,17 @@ def optimize_reserves(scenario: dict) -> dict:
         }
 
     Raises:
-        ValueError: if scenario is missing required keys.
+        ValueError: if scenario is missing required keys or mode is invalid.
     """
     required = {"scenario_type", "severity", "supply_gap_pct", "spr_days_remaining_estimate"}
     missing  = required - set(scenario.keys())
     if missing:
         raise ValueError(f"optimize_reserves() — scenario missing keys: {missing}")
+    if mode not in VALID_DRAWDOWN_MODES:
+        raise ValueError(
+            f"optimize_reserves() — invalid mode '{mode}'. "
+            f"Valid: {list(VALID_DRAWDOWN_MODES)}"
+        )
 
     scenario_type   = scenario["scenario_type"]
     severity        = float(scenario["severity"])
@@ -282,9 +369,12 @@ def optimize_reserves(scenario: dict) -> dict:
             scenario_type, DEFAULT_DISRUPTION_WINDOW_DAYS,
         )
 
+    # Procurement lead time (from config) drives when the SPR taper can begin (Task 8).
+    lead_time_days = assumptions.PROCUREMENT_LEAD_TIME_DAYS
+
     replenishment_days = round(window_days * REPLENISHMENT_OVERHEAD_FACTOR, 1)
 
-    drawdown_schedule = _build_drawdown_schedule(window_days)
+    drawdown_schedule = _build_dual_mode_schedule(window_days, lead_time_days, mode)
 
     policy_recommendation = _build_policy_recommendation(
         scenario_type   = scenario_type,
@@ -293,6 +383,8 @@ def optimize_reserves(scenario: dict) -> dict:
         days_remaining  = days_remaining,
         window_days     = window_days,
         replenishment_days = replenishment_days,
+        lead_time_days  = lead_time_days,
+        mode            = mode,
     )
 
     return {

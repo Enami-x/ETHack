@@ -15,28 +15,15 @@ import math
 import logging
 import pathlib
 from datetime import datetime, timezone
-from google import genai
 from dotenv import load_dotenv
+
+from agents.llm_client import generate_text, LLMUnavailable
 
 # Load .env
 _env_path = pathlib.Path(__file__).parent.parent / ".env"
 load_dotenv(_env_path)
 
 logger = logging.getLogger(__name__)
-
-# Model config — gemini-2.5-flash is the correct fast model
-GEMINI_MODEL_NAME = "gemini-2.5-flash"
-
-
-def _init_gemini() -> genai.Client | None:
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logger.warning("[RoutingAdvisor] GEMINI_API_KEY not set - LLM rationale disabled.")
-        return None
-    return genai.Client(api_key=api_key)
-
-
-_gemini_client = _init_gemini()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Port Registry
@@ -842,10 +829,7 @@ def _generate_rationale(
     risk_scores: dict,
     options: list[dict],
 ) -> str:
-    """Uses Gemini to explain the geopolitical trade-offs between routes."""
-    if _gemini_client is None:
-        return _fallback_rationale(origin, destination, brent, options)
-
+    """Uses the configured LLM (Groq by default) to explain route trade-offs."""
     summary_details = []
     for o in options:
         rec_str = {
@@ -893,13 +877,9 @@ def _generate_rationale(
     )
 
     try:
-        response = _gemini_client.models.generate_content(
-            model=GEMINI_MODEL_NAME,
-            contents=prompt,
-        )
-        return response.text.strip()
-    except Exception as exc:
-        logger.warning("[RoutingAdvisor] Gemini rationalisation failed: %s", exc)
+        return generate_text(prompt)
+    except LLMUnavailable as exc:
+        logger.warning("[RoutingAdvisor] LLM rationalisation unavailable: %s", exc)
         return _fallback_rationale(origin, destination, brent, options)
 
 
@@ -948,5 +928,5 @@ def _fallback_rationale(
         f"- Corridors transited: {', '.join(rec['corridors_crossed']) or 'No high-risk chokepoints'}\n\n"
         f"{alt_section}"
         f"---\n"
-        f"*LLM rationale offline — set `GEMINI_API_KEY` to enable AI-generated decision walkthrough.*"
+        f"*LLM rationale offline — set `GROQ_API_KEY` to enable AI-generated decision walkthrough.*"
     )

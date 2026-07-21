@@ -30,6 +30,8 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
+from config import assumptions
+
 # Load .env so SUPABASE_* keys are available (idempotent — safe to call repeatedly).
 load_dotenv(pathlib.Path(__file__).parent.parent / ".env")
 
@@ -37,33 +39,26 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# GLOBAL BASELINE ASSUMPTIONS — sourced from the problem statement
-# These are the "ground truth" anchors. Judges can inspect / challenge each one.
+# GLOBAL BASELINE ASSUMPTIONS — now sourced from config/assumptions.py (Task 6).
+# These module-level names are kept as thin aliases so the existing assumption
+# strings/formulas below still read naturally; the VALUES live in one cited place.
+# Edit config/assumptions.py (with citations + last_updated) to recalibrate.
 # =============================================================================
 
-# Baseline strategic petroleum reserve cover, in days.
-# Source: problem statement — "India's SPR provides ~9.5 days of cover".
-SPR_BASELINE_DAYS: float = 9.5
+# Baseline strategic petroleum reserve cover, in days (strategic reserve on hand:
+# 9.5 days at full capacity × ~64% current fill ≈ 6.08). See config for full sourcing.
+SPR_BASELINE_DAYS: float = assumptions.SPR_BASELINE_DAYS
 
-# Fraction of India's crude imports that transit the Strait of Hormuz.
-# Source: problem statement — "~45% of India's crude import volume transits Hormuz".
-# Real-world calibration: IEA / ERIA 2024 maritime trade data places this at 40–50%.
-HORMUZ_INDIA_SHARE: float = 0.45
+# Fraction of India's crude imports that transit the Strait of Hormuz (2026: ~0.30,
+# down from ~0.45 — ~70% of crude now routes outside Hormuz).
+HORMUZ_INDIA_SHARE: float = assumptions.HORMUZ_INDIA_SHARE
 
-# Fraction of India's crude imports affected by a full Red Sea suspension.
-# Mechanism is different from Hormuz: Red Sea closure forces Cape of Good Hope
-# rerouting (adding ~10–14 days transit time) rather than actual volume loss.
-# Direct crude volume share affected: ~15% (LNG/LPG is higher; crude is lower).
-# Source: Assumption; documented here as a testable parameter.
-RED_SEA_INDIA_CRUDE_SHARE: float = 0.15
+# Fraction of India's crude imports affected by a full Red Sea suspension (rerouting-
+# driven, not volume loss).
+RED_SEA_INDIA_CRUDE_SHARE: float = assumptions.RED_SEA_INDIA_CRUDE_SHARE
 
-# Fraction of India's crude imports sourced from OPEC+ producers.
-# An emergency cut affects only the "spare capacity" fraction, not total OPEC+ supply.
-# Effective direct India impact modelled at 25% of severity (conservative, since
-# India has long-term contracts and some non-OPEC diversification).
-# Source: Assumption; BP Statistical Review 2023 shows ~65% India crude from OPEC+,
-#         but emergency cuts typically affect spot/margin barrels first → 25% effective.
-OPEC_CUT_INDIA_EFFECTIVE_SHARE: float = 0.25
+# Effective India impact of an OPEC+ emergency cut, as a fraction of severity.
+OPEC_CUT_INDIA_EFFECTIVE_SHARE: float = assumptions.OPEC_CUT_INDIA_EFFECTIVE_SHARE
 
 
 # =============================================================================
@@ -73,16 +68,16 @@ OPEC_CUT_INDIA_EFFECTIVE_SHARE: float = 0.25
 #           1.0 = full closure — historically unprecedented but used for bounding).
 # =============================================================================
 
-# Price elasticity multiplier for a Hormuz closure.
+# Price elasticity multiplier for a Hormuz closure (from config/assumptions.py).
 # Calibration anchor: 2025 US-Iran escalation produced an ~8% single-session Brent
-# move on partial-closure fears. Modelled here as 1.8x the supply gap, reflecting
-# panic premium on top of pure scarcity. TESTABLE — adjust if market data changes.
-HORMUZ_PRICE_ELASTICITY: float = 1.8
+# move on partial-closure fears. Modelled as a multiple of the supply gap, reflecting
+# panic premium on top of pure scarcity. TESTABLE — edit config to recalibrate.
+HORMUZ_PRICE_ELASTICITY: float = assumptions.HORMUZ_PRICE_ELASTICITY
 
 # Refinery utilisation offset multiplier for Hormuz (<1.0 because refiners can
 # partially substitute with pre-contracted cargoes from alternate routes in the short
-# term, but cannot fully replace Hormuz volumes).
-HORMUZ_REFINERY_OFFSET: float = 0.9
+# term, but cannot fully replace Hormuz volumes). From config/assumptions.py.
+HORMUZ_REFINERY_OFFSET: float = assumptions.HORMUZ_REFINERY_OFFSET
 
 
 def _hormuz_partial_closure(severity: float) -> tuple[float, float, float, float, list[str]]:
@@ -104,7 +99,9 @@ def _hormuz_partial_closure(severity: float) -> tuple[float, float, float, float
 
     assumptions = [
         f"Hormuz carries {HORMUZ_INDIA_SHARE*100:.0f}% of India's crude import volume "
-        f"(problem statement baseline; IEA/ERIA 2024 range: 40–50%).",
+        f"(2026 import mix: ~70% of India's crude now routes OUTSIDE Hormuz — Russia via "
+        f"Cape/Suez, Americas & W.Africa across the Atlantic — leaving ~30% transiting it; "
+        f"down from the ~45% legacy figure. See config/assumptions.py).",
         f"Supply gap = severity ({severity:.2f}) × Hormuz share ({HORMUZ_INDIA_SHARE}) "
         f"= {supply_gap:.4f} ({supply_gap*100:.1f}% of India's crude supply at risk).",
         f"Price impact multiplier = {HORMUZ_PRICE_ELASTICITY}× (empirical elasticity). "
@@ -114,8 +111,10 @@ def _hormuz_partial_closure(severity: float) -> tuple[float, float, float, float
         f"<1.0 because refiners can partially substitute from alternate pre-contracted "
         f"cargoes in the short term, but cannot fully replace Hormuz volumes).",
         f"SPR estimate = {SPR_BASELINE_DAYS} days baseline × (1 − supply_gap) "
-        f"= {spr_days:.2f} days. Baseline from problem statement. Depleted proportionally "
-        f"to supply gap assuming uniform drawdown rate.",
+        f"= {spr_days:.2f} days. Baseline = strategic reserve on hand (9.5d at full "
+        f"capacity × ~64% current fill ≈ 6.08d; total national buffer incl. commercial "
+        f"stock ≈ 74d — see config/assumptions.py). Depleted proportionally to supply gap "
+        f"assuming uniform drawdown rate.",
         "Severity 1.0 = complete Hormuz closure — historically unprecedented; used for "
         "bounding. Severity 0.0 = baseline (no disruption).",
     ]
@@ -135,15 +134,14 @@ def _hormuz_partial_closure(severity: float) -> tuple[float, float, float, float
 # Rationale: OPEC cuts historically command higher price premium than logistics
 # events because they signal cartel coordination and sustained supply discipline.
 # Reference: 2022 OPEC+ 2 mb/d cut → ~$10/bbl immediate Brent move on ~3% supply
-# gap → ~3.3× elasticity. Using 2.2× as a conservative estimate since India has
-# partial long-term contract insulation. TESTABLE constant.
-OPEC_PRICE_ELASTICITY: float = 2.2
+# gap → ~3.3× elasticity. Using a conservative estimate since India has partial
+# long-term contract insulation. TESTABLE — from config/assumptions.py.
+OPEC_PRICE_ELASTICITY: float = assumptions.OPEC_PRICE_ELASTICITY
 
-# Refinery utilisation offset for an OPEC cut.
-# Lower impact than Hormuz because: (a) more advance notice, (b) refiners can
-# increase spot purchases from non-OPEC+ producers (US, Canada, Guyana),
-# (c) cuts typically phase in over weeks, not overnight.
-OPEC_REFINERY_OFFSET: float = 0.6
+# Refinery utilisation offset for an OPEC cut. Lower impact than Hormuz because:
+# (a) more advance notice, (b) refiners can increase spot purchases from non-OPEC+
+# producers (US, Canada, Guyana), (c) cuts phase in over weeks. From config.
+OPEC_REFINERY_OFFSET: float = assumptions.OPEC_REFINERY_OFFSET
 
 
 def _opec_emergency_cut(severity: float) -> tuple[float, float, float, float, list[str]]:
@@ -197,14 +195,13 @@ def _opec_emergency_cut(severity: float) -> tuple[float, float, float, float, li
 # Lower than Hormuz because rerouting absorbs much of the impact — markets price
 # freight costs and transit delays, not full supply scarcity.
 # Reference: 2024 Houthi Red Sea crisis produced ~5–8% Brent premium and ~300%
-# freight cost increase on Asia routes. Modelled at 1.3×. TESTABLE constant.
-RED_SEA_PRICE_ELASTICITY: float = 1.3
+# freight cost increase on Asia routes. Freight-dominated. TESTABLE — from config.
+RED_SEA_PRICE_ELASTICITY: float = assumptions.RED_SEA_PRICE_ELASTICITY
 
-# Refinery utilisation impact for Red Sea suspension.
-# Lowest of the three scenarios — most cargo eventually arrives via Cape of Good Hope;
-# the main impact is delayed deliveries and inventory drawdowns, not physical
-# volume shortfalls (at steady state). Short-term buffer from floating storage.
-RED_SEA_REFINERY_OFFSET: float = 0.4
+# Refinery utilisation impact for Red Sea suspension. Lowest of the three scenarios —
+# most cargo eventually arrives via Cape of Good Hope; the main impact is delayed
+# deliveries and inventory drawdowns, not physical volume shortfalls. From config.
+RED_SEA_REFINERY_OFFSET: float = assumptions.RED_SEA_REFINERY_OFFSET
 
 
 def _red_sea_suspension(severity: float) -> tuple[float, float, float, float, list[str]]:
@@ -268,6 +265,55 @@ VALID_SCENARIO_TYPES = set(_SCENARIO_FORMULAS.keys())
 
 
 # =============================================================================
+# UNCERTAINTY BANDS — propagate Stage 3 confidence into Stage 4 outputs (Task 3)
+# =============================================================================
+#
+# Rationale:
+#   Stage 3 computes a `confidence` (0–1) for each corridor's risk_score but the old
+#   handoff discarded it — only the scalar risk_score (used as `severity`) reached
+#   Stage 4. A point estimate with no uncertainty overstates precision. We now widen a
+#   low/expected/high band around EACH scenario metric as confidence drops:
+#
+#     half_width_fraction = BAND_MAX_HALF_WIDTH_FRAC × (1 − confidence)
+#     low  = expected × (1 − half_width_fraction)
+#     high = expected × (1 + half_width_fraction)
+#
+#   At confidence = 1.0 the band collapses to the point estimate (zero width).
+#   At confidence = 0.0 the band reaches ±BAND_MAX_HALF_WIDTH_FRAC of the estimate.
+#   The point estimate ("expected") is preserved for backward compatibility.
+
+# Maximum half-width of the band, as a fraction of the point estimate, reached at
+# zero confidence. 0.5 = ±50% around expected when confidence is 0. TESTABLE constant.
+BAND_MAX_HALF_WIDTH_FRAC: float = 0.5
+
+
+def _confidence_band(
+    expected: float,
+    confidence: float,
+    lo_clamp: float = 0.0,
+    hi_clamp: float | None = None,
+) -> dict:
+    """
+    Build a {low, expected, high} band around a point estimate, widening as
+    confidence falls. See the section comment for the formula. `lo_clamp`/`hi_clamp`
+    bound the band (e.g. percentages floored at 0; SPR days floored at 0).
+    """
+    conf = max(0.0, min(1.0, confidence))
+    hw   = BAND_MAX_HALF_WIDTH_FRAC * (1.0 - conf)
+    low  = expected * (1.0 - hw)
+    high = expected * (1.0 + hw)
+    if lo_clamp is not None:
+        low = max(lo_clamp, low)
+    if hi_clamp is not None:
+        high = min(hi_clamp, high)
+    return {
+        "low":      round(low, 4),
+        "expected": round(expected, 4),
+        "high":     round(high, 4),
+    }
+
+
+# =============================================================================
 # PUBLIC API
 # =============================================================================
 
@@ -275,6 +321,7 @@ def run_scenario(
     scenario_type: str,
     severity: float,
     corridor: str | None = None,
+    confidence: float = 1.0,
 ) -> dict:
     """
     Run a named disruption scenario and return a scenarios-table row (§5 Stage 4 schema).
@@ -287,18 +334,30 @@ def run_scenario(
         corridor:      Optional. If provided, the latest risk_score for this corridor
                        is fetched from Supabase and appended to assumptions as context.
                        Does NOT affect the formula math.
+        confidence:    Float 0.0–1.0 — the Stage 3 confidence for this corridor's
+                       risk reading (default 1.0 = full confidence, zero-width bands).
+                       Drives the low/expected/high uncertainty bands in `detail`.
+                       Does NOT change the point-estimate formula outputs.
 
     Returns:
-        Dict matching the §5 Stage 4 scenarios schema exactly:
+        Dict matching the §5 Stage 4 scenarios schema (point estimates unchanged),
+        plus a `detail` JSONB block carrying the uncertainty bands:
         {
             "id":                             str (uuid4),
             "scenario_type":                  str,
             "severity":                       float,
-            "supply_gap_pct":                 float,
+            "supply_gap_pct":                 float,   # point estimate (backward compat)
             "price_impact_pct":               float,
             "refinery_utilization_impact_pct": float,
             "spr_days_remaining_estimate":    float,
             "assumptions":                    list[str],
+            "detail": {                                # NEW — Task 3 (+ Task 6)
+                "confidence":                 float,
+                "supply_gap_pct_band":                {low, expected, high},
+                "price_impact_pct_band":              {low, expected, high},
+                "refinery_utilization_impact_pct_band": {low, expected, high},
+                "spr_days_remaining_estimate_band":   {low, expected, high},
+            },
             "generated_at":                   str (ISO8601),
         }
 
@@ -314,7 +373,34 @@ def run_scenario(
         raise ValueError(f"severity must be in [0.0, 1.0], got {severity}")
 
     formula_fn = _SCENARIO_FORMULAS[scenario_type]
-    supply_gap, price_imp, refinery, spr_days, assumptions = formula_fn(severity)
+    # NB: local list is `assumption_notes` (not `assumptions`) to avoid shadowing the
+    # imported config.assumptions module referenced in the detail block below.
+    supply_gap, price_imp, refinery, spr_days, assumption_notes = formula_fn(severity)
+
+    # --- Uncertainty bands derived from Stage 3 confidence (Task 3) -------------
+    # Percentages are floored at 0.0. SPR days floored at 0.0. No upper clamp on the
+    # high edge except SPR days, which cannot exceed the undisrupted baseline.
+    conf = max(0.0, min(1.0, confidence))
+    bands = {
+        "confidence": round(conf, 4),
+        "supply_gap_pct_band":  _confidence_band(supply_gap, conf, lo_clamp=0.0),
+        "price_impact_pct_band": _confidence_band(price_imp, conf, lo_clamp=0.0),
+        "refinery_utilization_impact_pct_band": _confidence_band(refinery, conf, lo_clamp=0.0),
+        "spr_days_remaining_estimate_band": _confidence_band(
+            spr_days, conf, lo_clamp=0.0, hi_clamp=SPR_BASELINE_DAYS
+        ),
+        # Which config assumptions produced these numbers (Task 6). Full cited block
+        # (all values + sources) is served by GET /api/assumptions.
+        "assumptions_block": {
+            "last_updated":               assumptions.LAST_UPDATED,
+            "spr_baseline_days":          SPR_BASELINE_DAYS,
+            "spr_current_fill_pct":       assumptions.SPR_CURRENT_FILL_PCT,
+            "total_national_buffer_days": assumptions.TOTAL_NATIONAL_BUFFER_DAYS,
+            "hormuz_india_share":         HORMUZ_INDIA_SHARE,
+            "red_sea_india_crude_share":  RED_SEA_INDIA_CRUDE_SHARE,
+            "opec_cut_india_effective_share": OPEC_CUT_INDIA_EFFECTIVE_SHARE,
+        },
+    }
 
     # -------------------------------------------------------------------------
     # Optional: fetch current corridor risk_score from Supabase for context.
@@ -335,14 +421,14 @@ def run_scenario(
             rows = resp.data
             if rows:
                 rs = rows[0]
-                assumptions.append(
+                assumption_notes.append(
                     f"Current live risk_score for '{corridor}' corridor: "
                     f"{rs['risk_score']:.4f} (confidence {rs['confidence']:.2f}, "
                     f"as of {rs['generated_at']}). Provided for context only — "
                     f"does not modify scenario formula outputs."
                 )
             else:
-                assumptions.append(
+                assumption_notes.append(
                     f"No risk_score found for '{corridor}' corridor in Supabase "
                     f"(run test_risk_intelligence.py first to populate)."
                 )
@@ -351,7 +437,7 @@ def run_scenario(
                 "[Stage4] Could not fetch risk_score for corridor='%s': %s. "
                 "Continuing without it.", corridor, exc
             )
-            assumptions.append(
+            assumption_notes.append(
                 f"Live risk_score for '{corridor}' corridor unavailable "
                 f"(Supabase fetch failed: {exc})."
             )
@@ -364,6 +450,7 @@ def run_scenario(
         "price_impact_pct":                 price_imp,
         "refinery_utilization_impact_pct":  refinery,
         "spr_days_remaining_estimate":      spr_days,
-        "assumptions":                      assumptions,
+        "assumptions":                      assumption_notes,
+        "detail":                           bands,
         "generated_at":                     datetime.now(timezone.utc).isoformat(),
     }

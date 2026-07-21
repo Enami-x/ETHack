@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS risk_scores (
     confidence              DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     explanation             TEXT NOT NULL DEFAULT '',
     contributing_signals    TEXT[] NOT NULL DEFAULT '{}',
+    -- detail: transparent breakdown (acute_score, sanctions_floor, signals_present/
+    -- missing, renormalised leading weights, confidence band). See risk_intelligence.py.
+    detail                  JSONB NOT NULL DEFAULT '{}',
     source                  TEXT NOT NULL CHECK (source IN ('real','mock')),
     generated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -60,6 +63,9 @@ CREATE TABLE IF NOT EXISTS scenarios (
     refinery_utilization_impact_pct DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     spr_days_remaining_estimate     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     assumptions                     TEXT[] NOT NULL DEFAULT '{}',
+    -- detail: low/expected/high uncertainty bands per metric + UI assumptions block.
+    -- See scenario_modeling.py.
+    detail                          JSONB NOT NULL DEFAULT '{}',
     generated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -119,6 +125,21 @@ CREATE INDEX IF NOT EXISTS idx_scenarios_type           ON scenarios(scenario_ty
 CREATE INDEX IF NOT EXISTS idx_procurement_scenario     ON procurement_recs(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_reserve_scenario         ON reserve_plans(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_reports_scenario         ON reports(scenario_id);
+
+-- =============================================================================
+-- MIGRATIONS — idempotent ALTERs for EXISTING deployments.
+-- The CREATE TABLE statements above use IF NOT EXISTS, so on an already-provisioned
+-- database the new `detail` columns are NOT added by the CREATE. Run these ALTERs
+-- (safe to re-run) to bring an existing risk_scores/scenarios table up to date.
+--
+--   detail on risk_scores  = { acute_score, sanctions_floor, score_driver,
+--                              signals_present, signals_missing, leading_weights,
+--                              type_severity, confidence_band }
+--   detail on scenarios    = { <metric>_band:{low,expected,high} per metric,
+--                              confidence, assumptions_block }
+-- =============================================================================
+ALTER TABLE risk_scores ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE scenarios   ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}';
 
 -- -------------------------------------------------------
 -- Pipeline Run Logs

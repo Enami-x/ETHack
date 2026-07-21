@@ -70,6 +70,24 @@ def save_to_supabase(table: str, data: list[dict]):
         supabase.table(table).insert(data).execute()
         logger.info(f"  Saved {len(data)} rows to {table}")
     except Exception as e:
+        # Graceful degradation for the new JSONB `detail` column: if the
+        # supabase_schema.sql migration (ADD COLUMN detail) has not been run yet,
+        # the insert fails on the unknown column. Rather than losing the whole
+        # stage, retry once without `detail` so the core row still persists.
+        if any("detail" in row for row in data):
+            logger.warning(
+                f"  Insert into {table} failed ({e}); retrying WITHOUT the 'detail' "
+                f"column. Run the ADD COLUMN detail migration in supabase_schema.sql "
+                f"to persist the richer breakdown."
+            )
+            stripped = [{k: v for k, v in row.items() if k != "detail"} for row in data]
+            try:
+                supabase.table(table).insert(stripped).execute()
+                logger.info(f"  Saved {len(stripped)} rows to {table} (without 'detail').")
+                return
+            except Exception as e2:
+                logger.error(f"  Retry without 'detail' also failed for {table}: {e2}")
+                raise
         logger.error(f"  Failed to save to {table}: {e}")
         raise
 
@@ -196,15 +214,20 @@ def run_pipeline(event_callback: Optional[Callable] = None):
             "opec_emergency_cut": "other"
         }
         risk_map = {rs["corridor"]: rs["risk_score"] for rs in risk_scores}
-        
+        conf_map = {rs["corridor"]: rs.get("confidence", 1.0) for rs in risk_scores}
+
         for stype, target_corridor in scenario_map.items():
             if target_corridor in risk_map:
-                severity = risk_map[target_corridor]
+                severity   = risk_map[target_corridor]
+                confidence = conf_map[target_corridor]
             else:
-                severity = max(risk_map.values()) if risk_map else 0.5
+                # No direct corridor (e.g. opec -> "other"): use the peak severity but
+                # the MINIMUM available confidence (most conservative — widest bands).
+                severity   = max(risk_map.values()) if risk_map else 0.5
+                confidence = min(conf_map.values()) if conf_map else 0.5
             severity = max(0.1, min(1.0, severity))
-            logger.info(f"  -> Scenario {stype} @ severity={severity:.2f}")
-            scen = run_scenario(stype, severity, target_corridor)
+            logger.info(f"  -> Scenario {stype} @ severity={severity:.2f} conf={confidence:.2f}")
+            scen = run_scenario(stype, severity, target_corridor, confidence=confidence)
             scenarios.append(scen)
             
         stage_timings["stage_4"] = time.time() - t0

@@ -109,6 +109,18 @@ def get_pipeline_status():
         return {"status": "no_runs_yet", "total_latency_seconds": None, "stage_timings": {}}
     return runs[0]
 
+@app.get("/api/assumptions", summary="Modelling assumptions (cited) driving scenarios + reserves")
+def get_assumptions():
+    """
+    Returns the UI-facing assumptions block: every Stage 4/6 modelling constant
+    (Hormuz share, SPR baseline/fill/total buffer, elasticity multipliers, India daily
+    consumption, procurement lead time) with a source citation and last_updated date.
+    Single source of truth is config/assumptions.py.
+    """
+    from config.assumptions import get_assumptions_block
+    return get_assumptions_block()
+
+
 @app.get("/api/crude-oil", summary="Live crude oil prices and supply data from EIA")
 def get_crude_oil():
     """
