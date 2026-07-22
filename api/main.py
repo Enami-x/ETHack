@@ -29,7 +29,7 @@ app = FastAPI(
 # Allow any localhost port — Vite picks 5173/5174/etc. depending on what's free.
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
