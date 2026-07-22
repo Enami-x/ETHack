@@ -13,7 +13,7 @@ import {
   CartesianGrid, Tooltip as RTooltip, Cell, Legend,
 } from 'recharts';
 import { assessRoute, fetchCrudeOil } from '../api';
-import SVGWorldMap from './SVGWorldMap';
+import LeafletRouteMap from './LeafletRouteMap';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Static port data (mirrors backend PORTS dict — used for fast UI render
@@ -634,10 +634,11 @@ export default function RoutingAdvisorPanel() {
         <div className="map-layout">
           {/* Map */}
           <div className="map-main">
-            <SVGWorldMap
+            <LeafletRouteMap
               origin={result.origin}
               destination={result.destination}
               waypoints={accepted.waypoints}
+              allRoutes={result.options}
               corridorRiskZones={result.corridor_zones}
               activeOptionId={accepted.id}
             />
@@ -652,8 +653,7 @@ export default function RoutingAdvisorPanel() {
                   {recBadge(accepted.recommendation).label}
                 </span>
               </div>
-              <div className="accepted-route-name">{accepted.name}</div>
-              <div className="rec-card__metrics" style={{ marginTop: 12 }}>
+              <div className="rec-card__metrics">
                 <div className="rec-metric">
                   <div className="rec-metric__label">Distance</div>
                   <div className="rec-metric__value">{accepted.distance_nm?.toLocaleString()} NM</div>

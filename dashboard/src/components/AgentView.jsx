@@ -6,7 +6,7 @@
  * Falls back to polling when SSE is not connected.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { triggerPipeline, simulatePipeline, createPipelineStream } from '../api';
+import { triggerPipeline, fetchPipelineStatus, createPipelineStream } from '../api';
 
 // ── Stage metadata ─────────────────────────────────────────────────────────
 const STAGES = [
@@ -332,6 +332,26 @@ export default function AgentView({ externalRunning, externalResult }) {
     };
   }, [handleEvent]);
 
+  // ── Auto-load last pipeline state on mount ───────────────────────────────
+  useEffect(() => {
+    async function loadLastRun() {
+      try {
+        const status = await fetchPipelineStatus();
+        if (!status || status.status === 'no_runs_yet' || !status.stage_timings) return;
+        const fb = {};
+        STAGES.forEach(s => {
+          const timing = status.stage_timings?.[s.id];
+          fb[s.id] = { status: timing != null ? 'done' : 'idle', elapsed: timing != null ? Math.round(timing) : null, data: {} };
+        });
+        setNodes(fb);
+        if (status.total_latency_seconds) setTotalElapsed(Math.round(status.total_latency_seconds));
+        addLog('pipeline_done', `↩  Last run restored · ${status.total_latency_seconds?.toFixed(1) ?? '?'}s total`);
+      } catch { /* no previous run available */ }
+    }
+    loadLastRun();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Elapsed counter while running ────────────────────────────────────────
   useEffect(() => {
     if (running) {
@@ -376,7 +396,70 @@ export default function AgentView({ externalRunning, externalResult }) {
     }
   }
 
-  // ── Simulate pipeline ─────────────────────────────────────────────────────
+  // ── Geopolitical Crisis Scenario Simulation ────────────────────────────────
+  const CRISIS_STAGES = [
+    {
+      stageId: 'stage_1', label: 'Data Collection', duration: 900,
+      logs: [
+        'OFAC SDN scan: 1,088 Iranian vessel/petroleum entities flagged',
+        'RSS GCaptain: IRGC speedboat intercepts — 4 incidents in 48h',
+        'EIA BRENT: $94.2/bbl — +15.7% 7-day surge detected',
+        'AIS anomaly: 23 VLCC tankers holding at Fujairah anchorage',
+      ],
+      data: { signals_collected: 1109, eia_brent: 94.2, eia_source: 'eia_live' },
+    },
+    {
+      stageId: 'stage_2', label: 'Signal Normalization', duration: 600,
+      logs: [
+        '1,109 raw signals → 28 processed (OFAC + 14 news + 2 price)',
+        'OFAC aggregate: corridor=hormuz, severity_hint=0.85 (CRITICAL)',
+        'EIA price signal severity: 0.978 — extreme 7-day volatility',
+      ],
+      data: { processed: 28 },
+    },
+    {
+      stageId: 'stage_3', label: 'Risk Intelligence', duration: 1800,
+      logs: [
+        '🧠 HORMUZ: acute_score=0.94 (news×0.75=0.92, price×0.25=0.89)',
+        '🧠 HORMUZ: sanctions_floor=0.40 → final risk_score=0.94 (acute-driven)',
+        '🧠 RED_SEA: risk_score=0.81 — Houthi drone activity + Brent spike',
+        'Confidence: 0.97 — 5 corroborating types, all <24h recency',
+        'LLM: "IRGC fast-attack craft in northern Hormuz choke. US 5th Fleet DEFCON-3."',
+      ],
+      data: { corridors_scored: 2, hormuz_risk: '0.940', red_sea_risk: '0.810' },
+    },
+    {
+      stageId: 'stage_4', label: 'Scenario Modeling', duration: 700,
+      logs: [
+        'HORMUZ_PARTIAL_CLOSURE @ sev=0.94: global supply_gap=+21%',
+        'Brent price impact: +$18.4/bbl (90-day, elasticity=0.62)',
+        'Refinery utilization drop: Vadinar −14.2%, Rotterdam −9.1%',
+        'SPR days-of-cover at current consumption: 8.3 days',
+      ],
+      data: { scenarios_run: 3, supply_gap_pct: '21.0%', price_impact_pct: '+22.5%' },
+    },
+    {
+      stageId: 'stage_5', label: 'Procurement Ranking', duration: 500,
+      logs: [
+        '#1 USA WTI (Houston) — score=0.91, 18d transit, $92.8/bbl, 0 chokepoints',
+        '#2 Guyana Stabroek — score=0.84, 22d, $91.1/bbl, Cape route',
+        '#3 Nigeria Bonny Light — score=0.78, ECOWAS corridor, risk=0.12',
+        '❌ Saudi Ras Tanura BLOCKED — Hormuz dependency risk=0.94',
+      ],
+      data: { recs_generated: 5, top_supplier: 'USA WTI (Houston)' },
+    },
+    {
+      stageId: 'stage_6', label: 'Reserve Optimization', duration: 400,
+      logs: [
+        'SPR baseline: 347M barrels · draw capacity: 726,169 kb/day',
+        'Drawdown schedule: 1.2M bbl/day × 18 days to bridge supply gap',
+        'Replenishment window: 45 days post-disruption (lead time buffer)',
+        '📋 ACTION: Activate IEA coordinated emergency SPR release',
+      ],
+      data: { days_cover: '8.3', drawdown_rate: '1.2M bbl/day' },
+    },
+  ];
+
   async function handleSimulate() {
     if (running || simulating) return;
     setSimulating(true);
@@ -385,30 +468,36 @@ export default function AgentView({ externalRunning, externalResult }) {
     setNodes(freshNodeState());
     setLogs([]);
     setTotalElapsed(null);
-    addLog('pipeline_start', '▶  Running simulator (no external calls)…');
 
-    try {
-      const result = await simulatePipeline();
-      // SSE events handle the node animation — fallback if not connected
-      if (!sseConnected) {
-        setTotalElapsed(Math.round(result?.total_latency_seconds ?? 0));
-        addLog('pipeline_done', `✓  Simulation complete in ${result?.total_latency_seconds?.toFixed(1) ?? '?'}s`);
-        const fb = {};
-        STAGES.forEach(s => {
-          const timing = result?.stage_timings?.[s.id];
-          fb[s.id] = { status: 'done', elapsed: timing ? Math.round(timing) : null, data: {} };
-        });
-        setNodes(fb);
+    addLog('pipeline_start', '▶  CRISIS SCENARIO: Strait of Hormuz — Partial Closure');
+    addLog('pipeline_start', '────────────────────────────────────────────────────────');
+
+    let totalMs = 0;
+    for (const stage of CRISIS_STAGES) {
+      setNodes(prev => ({ ...prev, [stage.stageId]: { status: 'running', elapsed: null, data: {} } }));
+      addLog('stage_start', `▷  [${stage.label}] running…`, new Date().toISOString());
+
+      const msPerLog = Math.floor(stage.duration / (stage.logs.length + 1));
+      for (const log of stage.logs) {
+        await new Promise(r => setTimeout(r, msPerLog));
+        addLog('stage_start', `   ${log}`, new Date().toISOString());
       }
-    } catch (err) {
-      const msg = err?.response?.data?.detail ?? err?.message ?? 'Unknown error';
-      setError(`Simulation failed: ${msg}`);
-      addLog('stage_error', `⚠  ${msg}`);
-    } finally {
-      setSimulating(false);
-      clearInterval(timerRef.current);
+      await new Promise(r => setTimeout(r, msPerLog));
+
+      const elapsedSec = +(stage.duration / 1000).toFixed(2);
+      totalMs += stage.duration;
+      setNodes(prev => ({ ...prev, [stage.stageId]: { status: 'done', elapsed: elapsedSec, data: stage.data } }));
+      addLog('stage_done', `✓  [${stage.label}] complete in ${elapsedSec}s`, new Date().toISOString());
     }
+
+    const totalSec = +(totalMs / 1000).toFixed(1);
+    setTotalElapsed(totalSec);
+    addLog('pipeline_done', '────────────────────────────────────────────────────────');
+    addLog('pipeline_done', `✓  CRISIS SIMULATION COMPLETE — ${totalSec}s`);
+    addLog('pipeline_done', '⚡  ACTION: Activate SPR emergency drawdown · Reroute via USA WTI');
+    setSimulating(false);
   }
+
 
   // ── Max elapsed (for timing bar normalisation) ───────────────────────────
   const maxElapsed = Math.max(
@@ -475,15 +564,15 @@ export default function AgentView({ externalRunning, externalResult }) {
             className="btn btn-olive"
             onClick={handleSimulate}
             disabled={running || simulating}
-            title="Run the instant simulator — no external calls, no Supabase writes"
+            title="Simulate a Hormuz closure crisis — scripted geopolitical scenario with specific intelligence"
           >
             {simulating ? (
               <>
                 <span className="spinner" />
-                Simulating…
+                Simulating crisis…
               </>
             ) : (
-              '⚡ Simulate'
+              '⚡ Simulate Crisis'
             )}
           </button>
         </div>
